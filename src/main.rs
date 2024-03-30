@@ -101,9 +101,52 @@ fn get_delta(direction: &Direction, speed: &Speed, time: &Res<Time>) -> Vec3 {
 // }
 
 #[derive(Component)]
-struct Enemy {
-    speed: f32,
-    hp: u16,
+struct Enemy;
+
+#[derive(Component)]
+struct Health(u16);
+
+#[derive(Bundle)]
+struct EnemyBundle {
+    speed: Speed,
+    hp: Health,
+    marker: Enemy,
+    sprite: SpriteBundle,
+}
+
+impl Default for EnemyBundle {
+    fn default() -> Self {
+        Self {
+            speed: Speed(100.),
+            hp: Health(10),
+            marker: Enemy,
+            sprite: SpriteBundle {
+                sprite: Sprite {
+                    color: Color::BLUE,
+                    custom_size: Some(Vec2::new(50., 50.)),
+                    ..default()
+                },
+                ..default()
+            },
+        }
+    }
+}
+
+impl EnemyBundle {
+    fn spawn_at(transform: Transform) -> Self {
+        EnemyBundle {
+            sprite: SpriteBundle {
+                sprite: Sprite {
+                    color: Color::BLUE,
+                    custom_size: Some(Vec2::new(50., 50.)),
+                    ..default()
+                },
+                transform,
+                ..Default::default()
+            },
+            ..default()
+        }
+    }
 }
 
 impl Enemy {
@@ -150,27 +193,21 @@ fn enemy_spawner(
         let mut position = Transform::from_xyz(distance, 0., 0.);
         position.rotate_around(Vec3::ZERO, Quat::from_rotation_z(income_angle));
 
-        commands.spawn(Enemy::spawn(
-            Enemy {
-                speed: 100.,
-                hp: 10,
-            },
-            position,
-        ));
+        commands.spawn(EnemyBundle::spawn_at(position));
     }
 }
 
 fn move_enemies(
     time: Res<Time>,
-    mut q_enemies: Query<(&mut Transform, &Enemy), Without<Player>>,
-    q_player: Query<&Transform, With<Player>>,
+    mut q_enemies: Query<(&mut Transform, &Speed), With<Enemy>>,
+    q_player: Query<&Transform, (With<Player>, Without<Enemy>)>,
 ) {
     let player_tr = q_player.single().translation;
-    q_enemies.iter_mut().for_each(|(mut enemy_tr, enemy)| {
+    q_enemies.iter_mut().for_each(|(mut enemy_tr, enemy_spd)| {
         let dir = get_direction(&player_tr.xy(), &enemy_tr.translation.xy());
         enemy_tr.translation += Vec3::new(
-            dir.x * time.delta_seconds() * enemy.speed,
-            dir.y * time.delta_seconds() * enemy.speed,
+            dir.x * time.delta_seconds() * enemy_spd.0,
+            dir.y * time.delta_seconds() * enemy_spd.0,
             0.,
         );
 
