@@ -1,7 +1,6 @@
 use core::time;
 
 use bevy::{
-    input::keyboard::KeyboardInput,
     math::bounding::{Aabb2d, IntersectsVolume},
     prelude::*,
     time::Stopwatch,
@@ -469,6 +468,7 @@ struct PlayerMoveEvent(MoveDirection);
 fn keyboard_input(
     keys: Res<ButtonInput<KeyCode>>,
     mut next_pause_state: ResMut<NextState<PausedState>>,
+    mut app_exit_events: ResMut<Events<bevy::app::AppExit>>,
     pause_state: Res<State<PausedState>>,
     mut ev_move: EventWriter<PlayerMoveEvent>,
 ) {
@@ -476,7 +476,9 @@ fn keyboard_input(
         KeyCode::Escape => match pause_state.get() {
             PausedState::Running => next_pause_state.set(PausedState::Paused),
             PausedState::Paused => next_pause_state.set(PausedState::Running),
-            PausedState::GameOver => {}
+            PausedState::GameOver => {
+                app_exit_events.send(bevy::app::AppExit);
+            }
         },
         _ => {}
     });
@@ -591,6 +593,50 @@ fn mouse_input(
     })
 }
 
+#[derive(Component)]
+struct GameOverScreen;
+
+#[derive(Bundle)]
+struct GameOverScreenBundle {
+    text: TextBundle,
+    marker: GameOverScreen,
+}
+
+impl Default for GameOverScreenBundle {
+    fn default() -> Self {
+        Self {
+            text: TextBundle {
+                text: Text::from_section(
+                    "Game Over",
+                    TextStyle {
+                        font_size: 100.,
+                        color: Color::RED,
+                        ..default()
+                    },
+                ),
+                visibility: Visibility::Hidden,
+                style: Style {
+                    position_type: PositionType::Relative,
+                    align_self: AlignSelf::Center,
+                    justify_self: JustifySelf::Center,
+                    ..default()
+                },
+                ..default()
+            },
+            marker: GameOverScreen,
+        }
+    }
+}
+
+fn spawn_game_over_message(mut commands: Commands) {
+    commands.spawn(GameOverScreenBundle::default());
+}
+
+fn reveal_game_over_screen(mut query: Query<&mut Visibility, With<GameOverScreen>>) {
+    let mut game_over = query.single_mut();
+    *game_over = Visibility::Visible;
+}
+
 fn main() {
     App::new()
         .add_plugins((DefaultPlugins,))
@@ -598,7 +644,10 @@ fn main() {
         .add_event::<ShootEvent>()
         .add_event::<PlayerMoveEvent>()
         .init_state::<PausedState>()
-        .add_systems(Startup, (draw_camera, draw_player).chain())
+        .add_systems(
+            Startup,
+            (draw_camera, draw_player, spawn_game_over_message).chain(),
+        )
         .configure_sets(
             Update,
             (
@@ -626,6 +675,7 @@ fn main() {
                     .in_set(GameplaySet::Bullets)
                     .chain(),
                 (move_player).in_set(GameplaySet::Player),
+                reveal_game_over_screen.run_if(in_state(PausedState::GameOver)),
             ),
         )
         .run();
