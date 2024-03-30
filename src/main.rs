@@ -39,36 +39,66 @@ impl Default for PlayerBundle {
 }
 
 #[derive(Component)]
-struct Bullet {
-    speed: f32,
-    direction: Vec2,
-    lifetime: Timer,
+struct Bullet;
+
+#[derive(Component)]
+struct Direction(Vec2);
+
+#[derive(Component)]
+struct BulletLifetimeTimer(Timer);
+
+#[derive(Bundle)]
+struct BulletBundle {
+    speed: Speed,
+    marker: Bullet,
+    direction: Direction,
+    lifetime: BulletLifetimeTimer,
+    sprite: SpriteBundle,
 }
 
-impl Bullet {
-    fn spawn(item: Bullet, pos: Transform) -> (SpriteBundle, Self) {
-        (
-            SpriteBundle {
+impl Default for BulletBundle {
+    fn default() -> Self {
+        Self {
+            speed: Speed(300.),
+            marker: Bullet,
+            direction: Direction(Vec2::new(1., 0.)),
+            lifetime: BulletLifetimeTimer(Timer::from_seconds(20., TimerMode::Once)),
+            sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::RED,
                     custom_size: Some(Vec2::new(10., 10.)),
                     ..default()
                 },
-                transform: pos,
                 ..default()
             },
-            item,
-        )
-    }
-
-    fn get_delta(&self, time: &Res<Time>) -> Vec3 {
-        Vec3::new(
-            self.direction.x * self.speed * time.delta_seconds(),
-            self.direction.y * self.speed * time.delta_seconds(),
-            0.,
-        )
+        }
     }
 }
+
+// impl Bullet {
+//     fn spawn(item: Bullet, pos: Transform) -> (SpriteBundle, Self) {
+//         (
+//             SpriteBundle {
+//                 sprite: Sprite {
+//                     color: Color::RED,
+//                     custom_size: Some(Vec2::new(10., 10.)),
+//                     ..default()
+//                 },
+//                 transform: pos,
+//                 ..default()
+//             },
+//             item,
+//         )
+//     }
+
+fn get_delta(direction: &Direction, speed: &Speed, time: &Res<Time>) -> Vec3 {
+    Vec3::new(
+        direction.0.x * speed.0 * time.delta_seconds(),
+        direction.0.y * speed.0 * time.delta_seconds(),
+        0.,
+    )
+}
+// }
 
 #[derive(Component)]
 struct Enemy {
@@ -182,19 +212,28 @@ fn move_player(
 
 fn move_bullets(
     mut commands: Commands,
-    mut q_bullets: Query<(&mut Transform, &mut Bullet, Entity)>,
+    mut q_bullets: Query<
+        (
+            &mut Transform,
+            &Direction,
+            &Speed,
+            &mut BulletLifetimeTimer,
+            Entity,
+        ),
+        With<Bullet>,
+    >,
     timer: Res<Time>,
 ) {
-    q_bullets
-        .iter_mut()
-        .for_each(|(mut bullet_tr, mut bullet, bullet_entity)| {
-            bullet_tr.translation += bullet.get_delta(&timer);
+    q_bullets.iter_mut().for_each(
+        |(mut bullet_tr, bullet_dir, bullet_spd, mut bullet_timer, bullet_entity)| {
+            bullet_tr.translation += get_delta(bullet_dir, bullet_spd, &timer);
 
-            bullet.lifetime.tick(timer.delta());
-            if bullet.lifetime.finished() {
+            bullet_timer.0.tick(timer.delta());
+            if bullet_timer.0.finished() {
                 commands.entity(bullet_entity).despawn()
             }
-        })
+        },
+    )
 }
 
 fn get_direction(src: &Vec2, target: &Vec2) -> Vec2 {
@@ -223,14 +262,22 @@ fn shoot(
                     primary_window.height() / 2.0 - position.y,
                 );
                 // let mut bullet_dir = player_tr.clone();
-                commands.spawn(Bullet::spawn(
-                    Bullet {
-                        speed: 300.,
-                        direction: get_direction(&actual_position, &player_tr.translation.xy()),
-                        lifetime: Timer::from_seconds(2., TimerMode::Once),
+                commands.spawn(BulletBundle {
+                    sprite: SpriteBundle {
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::new(10., 10.)),
+                            color: Color::RED,
+                            ..default()
+                        },
+                        transform: player_tr.clone(),
+                        ..default()
                     },
-                    player_tr.clone(),
-                ));
+                    direction: Direction(get_direction(
+                        &actual_position,
+                        &player_tr.translation.xy(),
+                    )),
+                    ..default()
+                });
             }
         }
         _ => {}
