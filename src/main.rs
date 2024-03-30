@@ -13,15 +13,28 @@ fn draw_camera(mut commands: Commands) {
 struct Player;
 
 #[derive(Component)]
+struct Damage(i32);
+
+#[derive(Component)]
 struct Speed(f32);
+
+#[derive(Component, Clone)]
+struct ReloadTimer(Timer);
+
+#[derive(Bundle)]
+struct ShooterBundle {
+    marker: Shooter,
+    hp: Health,
+    damage: Damage,
+    reload_timer: ReloadTimer,
+}
 
 #[derive(Bundle)]
 struct PlayerBundle {
     speed: Speed,
     marker: Player,
-    hp: Health,
+    shooter: ShooterBundle,
     sprite: SpriteBundle,
-    bullet_collider: BulletCollider,
 }
 
 impl Default for PlayerBundle {
@@ -29,8 +42,12 @@ impl Default for PlayerBundle {
         Self {
             speed: Speed(125.),
             marker: Player,
-            bullet_collider: BulletCollider,
-            hp: Health(30),
+            shooter: ShooterBundle {
+                marker: Shooter::Player,
+                hp: Health(30),
+                damage: Damage(5),
+                reload_timer: ReloadTimer(Timer::from_seconds(0.5, TimerMode::Repeating)),
+            },
             sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::GREEN,
@@ -45,9 +62,6 @@ impl Default for PlayerBundle {
 
 #[derive(Component)]
 struct Bullet;
-
-#[derive(Component)]
-struct BulletCollider;
 
 #[derive(Component)]
 struct Direction(Vec2);
@@ -156,19 +170,22 @@ struct Health(i32);
 #[derive(Bundle)]
 struct EnemyBundle {
     speed: Speed,
-    hp: Health,
     marker: Enemy,
+    shooter: ShooterBundle,
     sprite: SpriteBundle,
-    bullet_collider: BulletCollider,
 }
 
 impl Default for EnemyBundle {
     fn default() -> Self {
         Self {
             speed: Speed(100.),
-            hp: Health(10),
+            shooter: ShooterBundle {
+                marker: Shooter::Enemy,
+                hp: Health(10),
+                damage: Damage(5),
+                reload_timer: ReloadTimer(Timer::from_seconds(2., TimerMode::Repeating)),
+            },
             marker: Enemy,
-            bullet_collider: BulletCollider,
             sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::BLUE,
@@ -380,26 +397,27 @@ fn bullet_spawner(mut commands: Commands, mut ev_shoot: EventReader<ShootEvent>)
 }
 
 fn mouse_input(
-    q_player: Query<&Transform, With<Player>>,
+    mut q_player: Query<(&Transform, &mut ReloadTimer), With<Player>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
+    time: Res<Time>,
     mut ev_shoot: EventWriter<ShootEvent>,
     clicks: Res<ButtonInput<MouseButton>>,
 ) {
-    let player_tr = q_player.get_single().unwrap();
+    let (player_tr, mut reload_timer) = q_player.get_single_mut().unwrap();
     let primary_window = q_windows.get_single().unwrap();
-    clicks.get_just_pressed().into_iter().for_each(|k| match k {
+    clicks.get_pressed().into_iter().for_each(|k| match k {
         MouseButton::Left => {
             if let Some(position) = q_windows.single().cursor_position() {
                 let actual_position = Vec2::new(
                     position.x - primary_window.width() / 2.0,
                     primary_window.height() / 2.0 - position.y,
                 );
-                ev_shoot.send(ShootEvent {
-                    source: player_tr.translation.xy(),
-                    target: actual_position,
-                });
-
-                // let mut bullet_dir = player_tr.clone();
+                if reload_timer.0.tick(time.delta()).finished() {
+                    ev_shoot.send(ShootEvent {
+                        source: player_tr.translation.xy(),
+                        target: actual_position,
+                    });
+                }
             }
         }
         _ => {}
