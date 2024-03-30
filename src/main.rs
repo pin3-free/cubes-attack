@@ -12,7 +12,7 @@ fn draw_camera(mut commands: Commands) {
 #[derive(Component)]
 struct Player;
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 struct Damage(i32);
 
 #[derive(Component)]
@@ -27,6 +27,13 @@ struct ShooterBundle {
     hp: Health,
     damage: Damage,
     reload_timer: ReloadTimer,
+}
+
+#[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
+enum PausedState {
+    #[default]
+    Running,
+    Paused,
 }
 
 #[derive(Bundle)]
@@ -80,6 +87,7 @@ struct BulletBundle {
     speed: Speed,
     marker: Bullet,
     direction: Direction,
+    damage: Damage,
     lifetime: BulletLifetimeTimer,
     sprite: SpriteBundle,
     shooter: Shooter,
@@ -93,6 +101,7 @@ impl Default for BulletBundle {
             direction: Direction(Vec2::new(1., 0.)),
             lifetime: BulletLifetimeTimer(Timer::from_seconds(20., TimerMode::Once)),
             shooter: Shooter::Player,
+            damage: Damage(5),
             sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::RED,
@@ -106,12 +115,12 @@ impl Default for BulletBundle {
 }
 
 fn bullet_collision_processing(
-    mut q_bullets: Query<(&Transform, &Sprite, &Shooter, Entity), With<Bullet>>,
+    mut q_bullets: Query<(&Transform, &Sprite, &Shooter, &Damage, Entity), With<Bullet>>,
     mut q_colliders: Query<(&Transform, &Sprite, &mut Health, &Shooter), Without<Bullet>>,
     mut commands: Commands,
 ) {
     q_bullets.iter_mut().for_each(
-        |(bullet_tr, bullet_sprite, bullet_shooter, bullet_entity)| {
+        |(bullet_tr, bullet_sprite, bullet_shooter, bullet_dmg, bullet_entity)| {
             let bullet_size = bullet_sprite.custom_size.unwrap();
 
             q_colliders.iter_mut().for_each(
@@ -123,7 +132,7 @@ fn bullet_collision_processing(
                         match (bullet_shooter, entity_shooter) {
                             (Shooter::Enemy, Shooter::Player)
                             | (Shooter::Player, Shooter::Enemy) => {
-                                collider_hp.0 -= 5;
+                                collider_hp.0 -= bullet_dmg.0;
                                 commands.entity(bullet_entity).despawn();
                             }
                             (_, _) => {}
@@ -208,6 +217,7 @@ impl EnemyBundle {
 struct ShootEvent {
     source: Vec2,
     target: Vec2,
+    damage: Damage,
 }
 
 fn draw_player(mut commands: Commands) {
@@ -313,7 +323,19 @@ enum MoveDirection {
 #[derive(Event)]
 struct PlayerMoveEvent(MoveDirection);
 
-fn keyboard_input(keys: Res<ButtonInput<KeyCode>>, mut ev_move: EventWriter<PlayerMoveEvent>) {
+fn keyboard_input(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut next_pause_state: ResMut<NextState<PausedState>>,
+    pause_state: Res<State<PausedState>>,
+    mut ev_move: EventWriter<PlayerMoveEvent>,
+) {
+    keys.get_just_pressed().into_iter().for_each(|k| match k {
+        KeyCode::Escape => match pause_state.get() {
+            PausedState::Running => next_pause_state.set(PausedState::Paused),
+            PausedState::Paused => next_pause_state.set(PausedState::Running),
+        },
+        _ => {}
+    });
     keys.get_pressed().into_iter().for_each(|k| match k {
         KeyCode::KeyW => {
             ev_move.send(PlayerMoveEvent(MoveDirection::Up));
@@ -368,31 +390,38 @@ fn get_direction(src: &Vec2, target: &Vec2) -> Vec2 {
 }
 
 fn bullet_spawner(mut commands: Commands, mut ev_shoot: EventReader<ShootEvent>) {
-    ev_shoot.read().for_each(|ShootEvent { source, target }| {
-        commands.spawn(BulletBundle {
-            sprite: SpriteBundle {
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(10., 10.)),
-                    color: Color::RED,
+    ev_shoot.read().for_each(
+        |ShootEvent {
+             source,
+             target,
+             damage,
+         }| {
+            commands.spawn(BulletBundle {
+                sprite: SpriteBundle {
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(10., 10.)),
+                        color: Color::RED,
+                        ..default()
+                    },
+                    transform: Transform::from_xyz(source.x, source.y, 0.),
                     ..default()
                 },
-                transform: Transform::from_xyz(source.x, source.y, 0.),
+                direction: Direction(get_direction(&target, &source)),
+                damage: damage.clone(),
                 ..default()
-            },
-            direction: Direction(get_direction(&target, &source)),
-            ..default()
-        });
-    })
+            });
+        },
+    )
 }
 
 fn mouse_input(
-    mut q_player: Query<(&Transform, &mut ReloadTimer), With<Player>>,
+    mut q_player: Query<(&Transform, &mut ReloadTimer, &Damage), With<Player>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     time: Res<Time>,
     mut ev_shoot: EventWriter<ShootEvent>,
     clicks: Res<ButtonInput<MouseButton>>,
 ) {
-    let (player_tr, mut reload_timer) = q_player.get_single_mut().unwrap();
+    let (player_tr, mut reload_timer, player_dmg) = q_player.get_single_mut().unwrap();
     let primary_window = q_windows.get_single().unwrap();
     clicks.get_pressed().into_iter().for_each(|k| match k {
         MouseButton::Left => {
@@ -405,6 +434,7 @@ fn mouse_input(
                     ev_shoot.send(ShootEvent {
                         source: player_tr.translation.xy(),
                         target: actual_position,
+                        damage: player_dmg.clone(),
                     });
                 }
             }
@@ -419,7 +449,17 @@ fn main() {
         .insert_resource(EnemySpawnTimer(Timer::from_seconds(3., TimerMode::Once)))
         .add_event::<ShootEvent>()
         .add_event::<PlayerMoveEvent>()
+        .init_state::<PausedState>()
         .add_systems(Startup, (draw_camera, draw_player).chain())
+        .configure_sets(
+            Update,
+            (
+                GameplaySet::Bullets,
+                GameplaySet::Enemies,
+                GameplaySet::Player,
+            )
+                .run_if(in_state(PausedState::Running)),
+        )
         .add_systems(
             Update,
             (
