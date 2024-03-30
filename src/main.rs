@@ -1,12 +1,16 @@
 use core::time;
 
 use bevy::{
+    input::keyboard::KeyboardInput,
     math::bounding::{Aabb2d, IntersectsVolume},
     prelude::*,
     time::Stopwatch,
     window::PrimaryWindow,
 };
-use rand::prelude::*;
+use rand::{
+    distributions::{Distribution, Standard},
+    prelude::*,
+};
 
 fn draw_camera(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
@@ -18,7 +22,7 @@ struct Player;
 #[derive(Component, Clone)]
 struct Damage(i32);
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 struct Speed(f32);
 
 #[derive(Component, Clone)]
@@ -29,8 +33,6 @@ struct ReloadTime(time::Duration);
 
 #[derive(Bundle)]
 struct ShooterBundle {
-    marker: Shooter,
-    hp: Health,
     damage: Damage,
     since_last_reload: ReloadStopwatch,
     reload_time: ReloadTime,
@@ -41,12 +43,15 @@ enum PausedState {
     #[default]
     Running,
     Paused,
+    GameOver,
 }
 
 #[derive(Bundle)]
 struct PlayerBundle {
     speed: Speed,
     marker: Player,
+    hp: Health,
+    shooter_marker: Shooter,
     shooter: ShooterBundle,
     sprite: SpriteBundle,
 }
@@ -56,9 +61,9 @@ impl Default for PlayerBundle {
         Self {
             speed: Speed(125.),
             marker: Player,
+            hp: Health(30),
+            shooter_marker: Shooter::Player,
             shooter: ShooterBundle {
-                marker: Shooter::Player,
-                hp: Health(30),
                 damage: Damage(5),
                 reload_time: ReloadTime(time::Duration::from_secs_f32(0.25)),
                 since_last_reload: ReloadStopwatch(
@@ -156,11 +161,21 @@ fn bullet_collision_processing(
     );
 }
 
-fn dead_cleanup(q_health: Query<(&Health, Entity)>, mut commands: Commands) {
+fn dead_cleanup(
+    q_health: Query<(&Health, Entity, Option<&Player>)>,
+    mut next_state: ResMut<NextState<PausedState>>,
+    mut commands: Commands,
+) {
     q_health
         .iter()
-        .filter(|(Health(hp), _)| *hp <= 0)
-        .for_each(|(_, entity)| commands.entity(entity).despawn())
+        .filter(|(Health(hp), _, _)| *hp <= 0)
+        .for_each(|(_, entity, player_opt)| {
+            commands.entity(entity).despawn();
+
+            if player_opt.is_some() {
+                next_state.set(PausedState::GameOver);
+            }
+        });
 }
 
 fn get_delta(direction: &Direction, speed: &Speed, time: &Res<Time>) -> Vec3 {
@@ -211,32 +226,81 @@ fn stop_highlight(
         })
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 struct Enemy;
 
 #[derive(Component, Clone, Copy)]
 struct Health(i32);
 
-#[derive(Bundle)]
+#[derive(Bundle, Clone)]
 struct EnemyBundle {
     speed: Speed,
     marker: Enemy,
-    shooter: ShooterBundle,
+    shooter_marker: Shooter,
+    hp: Health,
     sprite: SpriteBundle,
+}
+
+#[derive(Bundle)]
+struct ShooterEnemyBundle {
+    enemy: EnemyBundle,
+    shooter: ShooterBundle,
+}
+
+impl ShooterEnemyBundle {
+    fn with_transform(self, transform: Transform) -> Self {
+        Self {
+            enemy: self.enemy.with_transform(transform),
+            shooter: self.shooter,
+        }
+    }
+}
+
+enum EnemyVariant {
+    Basic(EnemyBundle),
+    Shooter(ShooterEnemyBundle),
+}
+
+impl Distribution<EnemyVariant> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> EnemyVariant {
+        match rng.gen_range(0..=1) {
+            0 => EnemyVariant::Basic(EnemyBundle::default()),
+            _ => EnemyVariant::Shooter(ShooterEnemyBundle::default()),
+        }
+    }
+}
+
+impl Default for ShooterEnemyBundle {
+    fn default() -> Self {
+        Self {
+            enemy: EnemyBundle {
+                hp: Health(20),
+                sprite: SpriteBundle {
+                    sprite: Sprite {
+                        color: Color::PURPLE,
+                        custom_size: Some(Vec2::new(50., 50.)),
+                        ..default()
+                    },
+                    ..default()
+                },
+                ..default()
+            },
+            shooter: ShooterBundle {
+                damage: Damage(5),
+                since_last_reload: ReloadStopwatch(Stopwatch::new()),
+                reload_time: ReloadTime(time::Duration::from_secs(2)),
+            },
+        }
+    }
 }
 
 impl Default for EnemyBundle {
     fn default() -> Self {
         Self {
             speed: Speed(100.),
-            shooter: ShooterBundle {
-                marker: Shooter::Enemy,
-                hp: Health(10),
-                damage: Damage(5),
-                since_last_reload: ReloadStopwatch(Stopwatch::new()),
-                reload_time: ReloadTime(time::Duration::from_secs(2)),
-            },
+            hp: Health(10),
             marker: Enemy,
+            shooter_marker: Shooter::Enemy,
             sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::BLUE,
@@ -250,18 +314,13 @@ impl Default for EnemyBundle {
 }
 
 impl EnemyBundle {
-    fn spawn_at(transform: Transform) -> Self {
-        EnemyBundle {
+    fn with_transform(self, transform: Transform) -> Self {
+        Self {
             sprite: SpriteBundle {
-                sprite: Sprite {
-                    color: Color::BLUE,
-                    custom_size: Some(Vec2::new(50., 50.)),
-                    ..default()
-                },
                 transform,
-                ..Default::default()
+                ..self.sprite
             },
-            ..default()
+            ..self
         }
     }
 }
@@ -271,6 +330,7 @@ struct ShootEvent {
     source: Vec2,
     target: Vec2,
     damage: Damage,
+    shooter: Shooter,
 }
 
 fn draw_player(mut commands: Commands) {
@@ -311,8 +371,16 @@ fn enemy_spawner(
         .sqrt();
         let mut position = Transform::from_xyz(distance, 0., 0.);
         position.rotate_around(Vec3::ZERO, Quat::from_rotation_z(income_angle));
+        let new_enemy = rand::random::<EnemyVariant>();
 
-        commands.spawn(EnemyBundle::spawn_at(position));
+        match new_enemy {
+            EnemyVariant::Basic(b) => {
+                commands.spawn(b.with_transform(position));
+            }
+            EnemyVariant::Shooter(s) => {
+                commands.spawn(s.with_transform(position));
+            }
+        }
     }
 }
 
@@ -347,6 +415,28 @@ fn move_enemies(
 
         enemy_tr.rotate_z(rotation_angle);
     });
+}
+
+fn enemies_shoot(
+    time: Res<Time>,
+    q_player: Query<&Transform, (With<Player>, Without<Enemy>)>,
+    mut q_enemies: Query<(&Transform, &mut ReloadStopwatch, &ReloadTime, &Damage), With<Enemy>>,
+    mut ev_shoot: EventWriter<ShootEvent>,
+) {
+    let player_tr = q_player.single();
+    q_enemies
+        .iter_mut()
+        .for_each(|(e_tr, mut e_reload, e_reload_time, e_damage)| {
+            if e_reload.0.tick(time.delta()).elapsed() >= e_reload_time.0 {
+                e_reload.0.reset();
+                ev_shoot.send(ShootEvent {
+                    source: e_tr.translation.xy(),
+                    target: player_tr.translation.xy(),
+                    damage: e_damage.clone(),
+                    shooter: Shooter::Enemy,
+                });
+            }
+        })
 }
 
 fn move_player(
@@ -386,6 +476,7 @@ fn keyboard_input(
         KeyCode::Escape => match pause_state.get() {
             PausedState::Running => next_pause_state.set(PausedState::Paused),
             PausedState::Paused => next_pause_state.set(PausedState::Running),
+            PausedState::GameOver => {}
         },
         _ => {}
     });
@@ -448,6 +539,7 @@ fn bullet_spawner(mut commands: Commands, mut ev_shoot: EventReader<ShootEvent>)
              source,
              target,
              damage,
+             shooter,
          }| {
             commands.spawn(BulletBundle {
                 sprite: SpriteBundle {
@@ -461,6 +553,7 @@ fn bullet_spawner(mut commands: Commands, mut ev_shoot: EventReader<ShootEvent>)
                 },
                 direction: Direction(get_direction(&target, &source)),
                 damage: damage.clone(),
+                shooter: *shooter,
                 ..default()
             });
         },
@@ -489,6 +582,7 @@ fn mouse_input(
                         source: player_tr.translation.xy(),
                         target: actual_position,
                         damage: player_dmg.clone(),
+                        shooter: Shooter::Player,
                     });
                 }
             }
@@ -511,6 +605,7 @@ fn main() {
                 GameplaySet::Bullets,
                 GameplaySet::Enemies,
                 GameplaySet::Player,
+                InputSet::Mouse,
             )
                 .run_if(in_state(PausedState::Running)),
         )
@@ -519,7 +614,7 @@ fn main() {
             (
                 (mouse_input).in_set(InputSet::Mouse),
                 (keyboard_input).in_set(InputSet::Keyboard),
-                (enemy_spawner, move_enemies).in_set(GameplaySet::Enemies),
+                (enemy_spawner, move_enemies, enemies_shoot).in_set(GameplaySet::Enemies),
                 (
                     bullet_spawner,
                     move_bullets,
