@@ -1,7 +1,8 @@
-use bevy::{prelude::*, window::PrimaryWindow};
-// use bevy_prng::WyRand;
-// use bevy_rand::prelude::GlobalEntropy;
-// use rand_core::RngCore;
+use bevy::{
+    math::bounding::{Aabb2d, IntersectsVolume},
+    prelude::*,
+    window::PrimaryWindow,
+};
 use rand::prelude::*;
 
 fn draw_camera(mut commands: Commands) {
@@ -18,7 +19,9 @@ struct Speed(f32);
 struct PlayerBundle {
     speed: Speed,
     marker: Player,
+    hp: Health,
     sprite: SpriteBundle,
+    bullet_collider: BulletCollider,
 }
 
 impl Default for PlayerBundle {
@@ -26,6 +29,8 @@ impl Default for PlayerBundle {
         Self {
             speed: Speed(125.),
             marker: Player,
+            bullet_collider: BulletCollider,
+            hp: Health(30),
             sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::GREEN,
@@ -42,10 +47,19 @@ impl Default for PlayerBundle {
 struct Bullet;
 
 #[derive(Component)]
+struct BulletCollider;
+
+#[derive(Component)]
 struct Direction(Vec2);
 
 #[derive(Component)]
 struct BulletLifetimeTimer(Timer);
+
+#[derive(Component, Clone, Copy)]
+enum Shooter {
+    Player,
+    Enemy,
+}
 
 #[derive(Bundle)]
 struct BulletBundle {
@@ -54,6 +68,7 @@ struct BulletBundle {
     direction: Direction,
     lifetime: BulletLifetimeTimer,
     sprite: SpriteBundle,
+    shooter: Shooter,
 }
 
 impl Default for BulletBundle {
@@ -63,6 +78,7 @@ impl Default for BulletBundle {
             marker: Bullet,
             direction: Direction(Vec2::new(1., 0.)),
             lifetime: BulletLifetimeTimer(Timer::from_seconds(20., TimerMode::Once)),
+            shooter: Shooter::Player,
             sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::RED,
@@ -73,6 +89,54 @@ impl Default for BulletBundle {
             },
         }
     }
+}
+
+fn bullet_collision_processing(
+    mut q_bullets: Query<(&Transform, &Sprite, &Shooter, Entity), With<Bullet>>,
+    mut q_colliders: Query<
+        (
+            &Transform,
+            &Sprite,
+            &mut Health,
+            Option<&Player>,
+            Option<&Enemy>,
+        ),
+        Without<Bullet>,
+    >,
+    mut commands: Commands,
+) {
+    q_bullets.iter_mut().for_each(
+        |(bullet_tr, bullet_sprite, bullet_shooter, bullet_entity)| {
+            let bullet_size = bullet_sprite.custom_size.unwrap();
+
+            q_colliders.iter_mut().for_each(
+                |(collider_tr, collider_sprite, mut collider_hp, opt_player, opt_enemy)| {
+                    let collider_size = collider_sprite.custom_size.unwrap();
+                    if Aabb2d::new(collider_tr.translation.xy(), collider_size * 0.5)
+                        .intersects(&Aabb2d::new(bullet_tr.translation.xy(), bullet_size * 0.5))
+                    {
+                        match (bullet_shooter, opt_player, opt_enemy) {
+                            (Shooter::Enemy, Some(_), None) | (Shooter::Player, None, Some(_)) => {
+                                collider_hp.0 -= 5;
+                                commands.entity(bullet_entity).despawn();
+                            }
+                            (_, Some(_), Some(_)) | (_, None, None) => {
+                                panic!("Failed to match identificator");
+                            }
+                            (_, _, _) => {}
+                        }
+                    }
+                },
+            )
+        },
+    );
+}
+
+fn dead_cleanup(q_health: Query<(&Health, Entity)>, mut commands: Commands) {
+    q_health
+        .iter()
+        .filter(|(Health(hp), _)| *hp <= 0)
+        .for_each(|(_, entity)| commands.entity(entity).despawn())
 }
 
 fn get_delta(direction: &Direction, speed: &Speed, time: &Res<Time>) -> Vec3 {
@@ -86,8 +150,8 @@ fn get_delta(direction: &Direction, speed: &Speed, time: &Res<Time>) -> Vec3 {
 #[derive(Component)]
 struct Enemy;
 
-#[derive(Component)]
-struct Health(u16);
+#[derive(Component, Clone, Copy)]
+struct Health(i32);
 
 #[derive(Bundle)]
 struct EnemyBundle {
@@ -95,6 +159,7 @@ struct EnemyBundle {
     hp: Health,
     marker: Enemy,
     sprite: SpriteBundle,
+    bullet_collider: BulletCollider,
 }
 
 impl Default for EnemyBundle {
@@ -103,6 +168,7 @@ impl Default for EnemyBundle {
             speed: Speed(100.),
             hp: Health(10),
             marker: Enemy,
+            bullet_collider: BulletCollider,
             sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::BLUE,
@@ -342,7 +408,7 @@ fn mouse_input(
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins((DefaultPlugins,))
         .insert_resource(EnemySpawnTimer(Timer::from_seconds(3., TimerMode::Once)))
         .add_event::<ShootEvent>()
         .add_event::<PlayerMoveEvent>()
@@ -353,7 +419,13 @@ fn main() {
                 (mouse_input).in_set(InputSet::Mouse),
                 (keyboard_input).in_set(InputSet::Keyboard),
                 (enemy_spawner, move_enemies).in_set(GameplaySet::Enemies),
-                (bullet_spawner, move_bullets).in_set(GameplaySet::Bullets),
+                (
+                    bullet_spawner,
+                    move_bullets,
+                    bullet_collision_processing,
+                    dead_cleanup,
+                )
+                    .in_set(GameplaySet::Bullets),
                 (move_player).in_set(GameplaySet::Player),
             ),
         )
