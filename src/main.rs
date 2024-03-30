@@ -1,6 +1,9 @@
+use core::time;
+
 use bevy::{
     math::bounding::{Aabb2d, IntersectsVolume},
     prelude::*,
+    time::Stopwatch,
     window::PrimaryWindow,
 };
 use rand::prelude::*;
@@ -19,14 +22,18 @@ struct Damage(i32);
 struct Speed(f32);
 
 #[derive(Component, Clone)]
-struct ReloadTimer(Timer);
+struct ReloadStopwatch(Stopwatch);
+
+#[derive(Component)]
+struct ReloadTime(time::Duration);
 
 #[derive(Bundle)]
 struct ShooterBundle {
     marker: Shooter,
     hp: Health,
     damage: Damage,
-    reload_timer: ReloadTimer,
+    since_last_reload: ReloadStopwatch,
+    reload_time: ReloadTime,
 }
 
 #[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
@@ -53,7 +60,12 @@ impl Default for PlayerBundle {
                 marker: Shooter::Player,
                 hp: Health(30),
                 damage: Damage(5),
-                reload_timer: ReloadTimer(Timer::from_seconds(0.5, TimerMode::Repeating)),
+                reload_time: ReloadTime(time::Duration::from_secs_f32(0.25)),
+                since_last_reload: ReloadStopwatch(
+                    Stopwatch::new()
+                        .tick(std::time::Duration::from_secs_f32(0.25))
+                        .clone(),
+                ),
             },
             sprite: SpriteBundle {
                 sprite: Sprite {
@@ -160,6 +172,46 @@ fn get_delta(direction: &Direction, speed: &Speed, time: &Res<Time>) -> Vec3 {
 }
 
 #[derive(Component)]
+struct HitBlinkTimer {
+    return_to: Color,
+    timer: Timer,
+}
+
+fn on_hit_highlight(
+    mut hit_query: Query<(&mut Sprite, Ref<Health>, Entity), Changed<Health>>,
+    mut commands: Commands,
+) {
+    hit_query
+        .iter_mut()
+        .for_each(|(mut sprite, health, entity)| {
+            if health.is_changed() {
+                if !sprite.is_changed() {
+                    commands.entity(entity).insert(HitBlinkTimer {
+                        return_to: sprite.color,
+                        timer: Timer::from_seconds(0.05, TimerMode::Once),
+                    });
+                    sprite.color = Color::RED;
+                }
+            }
+        });
+}
+
+fn stop_highlight(
+    mut query: Query<(&mut Sprite, &mut HitBlinkTimer, Entity)>,
+    mut commands: Commands,
+    time: Res<Time>,
+) {
+    query
+        .iter_mut()
+        .for_each(|(mut sprite, mut blink_timer, entity)| {
+            if blink_timer.timer.tick(time.delta()).finished() {
+                sprite.color = blink_timer.return_to;
+                commands.entity(entity).remove::<HitBlinkTimer>();
+            }
+        })
+}
+
+#[derive(Component)]
 struct Enemy;
 
 #[derive(Component, Clone, Copy)]
@@ -181,7 +233,8 @@ impl Default for EnemyBundle {
                 marker: Shooter::Enemy,
                 hp: Health(10),
                 damage: Damage(5),
-                reload_timer: ReloadTimer(Timer::from_seconds(2., TimerMode::Repeating)),
+                since_last_reload: ReloadStopwatch(Stopwatch::new()),
+                reload_time: ReloadTime(time::Duration::from_secs(2)),
             },
             marker: Enemy,
             sprite: SpriteBundle {
@@ -415,13 +468,13 @@ fn bullet_spawner(mut commands: Commands, mut ev_shoot: EventReader<ShootEvent>)
 }
 
 fn mouse_input(
-    mut q_player: Query<(&Transform, &mut ReloadTimer, &Damage), With<Player>>,
+    mut q_player: Query<(&Transform, &mut ReloadStopwatch, &ReloadTime, &Damage), With<Player>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     time: Res<Time>,
     mut ev_shoot: EventWriter<ShootEvent>,
     clicks: Res<ButtonInput<MouseButton>>,
 ) {
-    let (player_tr, mut reload_timer, player_dmg) = q_player.get_single_mut().unwrap();
+    let (player_tr, mut reload_watch, reload_time, player_dmg) = q_player.get_single_mut().unwrap();
     let primary_window = q_windows.get_single().unwrap();
     clicks.get_pressed().into_iter().for_each(|k| match k {
         MouseButton::Left => {
@@ -430,7 +483,8 @@ fn mouse_input(
                     position.x - primary_window.width() / 2.0,
                     primary_window.height() / 2.0 - position.y,
                 );
-                if reload_timer.0.tick(time.delta()).finished() {
+                if reload_watch.0.tick(time.delta()).elapsed() >= reload_time.0 {
+                    reload_watch.0.reset();
                     ev_shoot.send(ShootEvent {
                         source: player_tr.translation.xy(),
                         target: actual_position,
@@ -470,9 +524,12 @@ fn main() {
                     bullet_spawner,
                     move_bullets,
                     bullet_collision_processing,
+                    on_hit_highlight,
+                    stop_highlight,
                     dead_cleanup,
                 )
-                    .in_set(GameplaySet::Bullets),
+                    .in_set(GameplaySet::Bullets)
+                    .chain(),
                 (move_player).in_set(GameplaySet::Player),
             ),
         )
