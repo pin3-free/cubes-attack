@@ -75,22 +75,6 @@ impl Default for BulletBundle {
     }
 }
 
-// impl Bullet {
-//     fn spawn(item: Bullet, pos: Transform) -> (SpriteBundle, Self) {
-//         (
-//             SpriteBundle {
-//                 sprite: Sprite {
-//                     color: Color::RED,
-//                     custom_size: Some(Vec2::new(10., 10.)),
-//                     ..default()
-//                 },
-//                 transform: pos,
-//                 ..default()
-//             },
-//             item,
-//         )
-//     }
-
 fn get_delta(direction: &Direction, speed: &Speed, time: &Res<Time>) -> Vec3 {
     Vec3::new(
         direction.0.x * speed.0 * time.delta_seconds(),
@@ -98,7 +82,6 @@ fn get_delta(direction: &Direction, speed: &Speed, time: &Res<Time>) -> Vec3 {
         0.,
     )
 }
-// }
 
 #[derive(Component)]
 struct Enemy;
@@ -149,25 +132,27 @@ impl EnemyBundle {
     }
 }
 
-impl Enemy {
-    fn spawn(item: Enemy, pos: Transform) -> (SpriteBundle, Self) {
-        (
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::BLUE,
-                    custom_size: Some(Vec2::new(50., 50.)),
-                    ..default()
-                },
-                transform: pos,
-                ..default()
-            },
-            item,
-        )
-    }
+#[derive(Event)]
+struct ShootEvent {
+    source: Vec2,
+    target: Vec2,
 }
 
 fn draw_player(mut commands: Commands) {
     commands.spawn(PlayerBundle::default());
+}
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+enum GameplaySet {
+    Enemies,
+    Player,
+    Bullets,
+}
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+enum InputSet {
+    Mouse,
+    Keyboard,
 }
 
 #[derive(Resource)]
@@ -188,8 +173,7 @@ fn enemy_spawner(
         let primary_window = q_windows.single();
         let distance = ((primary_window.width() / 2.).powf(2.)
             + (primary_window.height() / 2.).powf(2.))
-        .sqrt()
-            - 300.;
+        .sqrt();
         let mut position = Transform::from_xyz(distance, 0., 0.);
         position.rotate_around(Vec3::ZERO, Quat::from_rotation_z(income_angle));
 
@@ -232,18 +216,46 @@ fn move_enemies(
 
 fn move_player(
     mut query: Query<(&mut Transform, &Speed), With<Player>>,
-    keys: Res<ButtonInput<KeyCode>>,
+    mut ev_move: EventReader<PlayerMoveEvent>,
     time: Res<Time>,
 ) {
-    query.iter_mut().for_each(|(mut transform, Speed(speed))| {
-        let delta = time.delta_seconds() * speed;
-        keys.get_pressed().into_iter().for_each(|k| match k {
-            KeyCode::KeyW => transform.translation.y += delta,
-            KeyCode::KeyA => transform.translation.x -= delta,
-            KeyCode::KeyS => transform.translation.y -= delta,
-            KeyCode::KeyD => transform.translation.x += delta,
-            _ => {}
-        })
+    let (mut transform, speed) = query.single_mut();
+    let delta = time.delta_seconds() * speed.0;
+    ev_move
+        .read()
+        .for_each(|PlayerMoveEvent(direction)| match direction {
+            MoveDirection::Up => transform.translation.y += delta,
+            MoveDirection::Down => transform.translation.y -= delta,
+            MoveDirection::Left => transform.translation.x -= delta,
+            MoveDirection::Right => transform.translation.x += delta,
+        });
+}
+
+enum MoveDirection {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+#[derive(Event)]
+struct PlayerMoveEvent(MoveDirection);
+
+fn keyboard_input(keys: Res<ButtonInput<KeyCode>>, mut ev_move: EventWriter<PlayerMoveEvent>) {
+    keys.get_pressed().into_iter().for_each(|k| match k {
+        KeyCode::KeyW => {
+            ev_move.send(PlayerMoveEvent(MoveDirection::Up));
+        }
+        KeyCode::KeyA => {
+            ev_move.send(PlayerMoveEvent(MoveDirection::Left));
+        }
+        KeyCode::KeyS => {
+            ev_move.send(PlayerMoveEvent(MoveDirection::Down));
+        }
+        KeyCode::KeyD => {
+            ev_move.send(PlayerMoveEvent(MoveDirection::Right));
+        }
+        _ => {}
     });
 }
 
@@ -283,10 +295,28 @@ fn get_direction(src: &Vec2, target: &Vec2) -> Vec2 {
     dir
 }
 
-fn shoot(
+fn bullet_spawner(mut commands: Commands, mut ev_shoot: EventReader<ShootEvent>) {
+    ev_shoot.read().for_each(|ShootEvent { source, target }| {
+        commands.spawn(BulletBundle {
+            sprite: SpriteBundle {
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(10., 10.)),
+                    color: Color::RED,
+                    ..default()
+                },
+                transform: Transform::from_xyz(source.x, source.y, 0.),
+                ..default()
+            },
+            direction: Direction(get_direction(&target, &source)),
+            ..default()
+        });
+    })
+}
+
+fn mouse_input(
     q_player: Query<&Transform, With<Player>>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
-    mut commands: Commands,
+    mut ev_shoot: EventWriter<ShootEvent>,
     clicks: Res<ButtonInput<MouseButton>>,
 ) {
     let player_tr = q_player.get_single().unwrap();
@@ -298,23 +328,12 @@ fn shoot(
                     position.x - primary_window.width() / 2.0,
                     primary_window.height() / 2.0 - position.y,
                 );
-                // let mut bullet_dir = player_tr.clone();
-                commands.spawn(BulletBundle {
-                    sprite: SpriteBundle {
-                        sprite: Sprite {
-                            custom_size: Some(Vec2::new(10., 10.)),
-                            color: Color::RED,
-                            ..default()
-                        },
-                        transform: player_tr.clone(),
-                        ..default()
-                    },
-                    direction: Direction(get_direction(
-                        &actual_position,
-                        &player_tr.translation.xy(),
-                    )),
-                    ..default()
+                ev_shoot.send(ShootEvent {
+                    source: player_tr.translation.xy(),
+                    target: actual_position,
                 });
+
+                // let mut bullet_dir = player_tr.clone();
             }
         }
         _ => {}
@@ -325,15 +344,17 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .insert_resource(EnemySpawnTimer(Timer::from_seconds(3., TimerMode::Once)))
+        .add_event::<ShootEvent>()
+        .add_event::<PlayerMoveEvent>()
         .add_systems(Startup, (draw_camera, draw_player).chain())
         .add_systems(
             Update,
             (
-                shoot,
-                move_player,
-                move_bullets,
-                enemy_spawner,
-                move_enemies,
+                (mouse_input).in_set(InputSet::Mouse),
+                (keyboard_input).in_set(InputSet::Keyboard),
+                (enemy_spawner, move_enemies).in_set(GameplaySet::Enemies),
+                (bullet_spawner, move_bullets).in_set(GameplaySet::Bullets),
+                (move_player).in_set(GameplaySet::Player),
             ),
         )
         .run();
