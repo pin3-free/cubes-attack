@@ -9,24 +9,32 @@ fn draw_camera(mut commands: Commands) {
 }
 
 #[derive(Component)]
-struct Player {
-    speed: f32,
+struct Player;
+
+#[derive(Component)]
+struct Speed(f32);
+
+#[derive(Bundle)]
+struct PlayerBundle {
+    speed: Speed,
+    marker: Player,
+    sprite: SpriteBundle,
 }
 
-impl Player {
-    fn spawn(item: Player, pos: Transform) -> (SpriteBundle, Self) {
-        (
-            SpriteBundle {
+impl Default for PlayerBundle {
+    fn default() -> Self {
+        Self {
+            speed: Speed(125.),
+            marker: Player,
+            sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::GREEN,
                     custom_size: Some(Vec2::new(50., 50.)),
                     ..default()
                 },
-                transform: pos,
                 ..default()
             },
-            item,
-        )
+        }
     }
 }
 
@@ -86,10 +94,7 @@ impl Enemy {
 }
 
 fn draw_player(mut commands: Commands) {
-    commands.spawn(Player::spawn(
-        Player { speed: 125. },
-        Transform::from_xyz(0., 0., 0.),
-    ));
+    commands.spawn(PlayerBundle::default());
 }
 
 #[derive(Resource)]
@@ -159,22 +164,20 @@ fn move_enemies(
 }
 
 fn move_player(
-    mut query: Query<(&mut Transform, &Player)>,
+    mut query: Query<(&mut Transform, &Speed), With<Player>>,
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
 ) {
-    query
-        .iter_mut()
-        .for_each(|(mut transform, Player { speed })| {
-            let delta = time.delta_seconds() * speed;
-            keys.get_pressed().into_iter().for_each(|k| match k {
-                KeyCode::KeyW => transform.translation.y += delta,
-                KeyCode::KeyA => transform.translation.x -= delta,
-                KeyCode::KeyS => transform.translation.y -= delta,
-                KeyCode::KeyD => transform.translation.x += delta,
-                _ => {}
-            })
-        });
+    query.iter_mut().for_each(|(mut transform, Speed(speed))| {
+        let delta = time.delta_seconds() * speed;
+        keys.get_pressed().into_iter().for_each(|k| match k {
+            KeyCode::KeyW => transform.translation.y += delta,
+            KeyCode::KeyA => transform.translation.x -= delta,
+            KeyCode::KeyS => transform.translation.y -= delta,
+            KeyCode::KeyD => transform.translation.x += delta,
+            _ => {}
+        })
+    });
 }
 
 fn move_bullets(
