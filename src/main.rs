@@ -107,16 +107,7 @@ impl Default for BulletBundle {
 
 fn bullet_collision_processing(
     mut q_bullets: Query<(&Transform, &Sprite, &Shooter, Entity), With<Bullet>>,
-    mut q_colliders: Query<
-        (
-            &Transform,
-            &Sprite,
-            &mut Health,
-            Option<&Player>,
-            Option<&Enemy>,
-        ),
-        Without<Bullet>,
-    >,
+    mut q_colliders: Query<(&Transform, &Sprite, &mut Health, &Shooter), Without<Bullet>>,
     mut commands: Commands,
 ) {
     q_bullets.iter_mut().for_each(
@@ -124,20 +115,18 @@ fn bullet_collision_processing(
             let bullet_size = bullet_sprite.custom_size.unwrap();
 
             q_colliders.iter_mut().for_each(
-                |(collider_tr, collider_sprite, mut collider_hp, opt_player, opt_enemy)| {
+                |(collider_tr, collider_sprite, mut collider_hp, entity_shooter)| {
                     let collider_size = collider_sprite.custom_size.unwrap();
                     if Aabb2d::new(collider_tr.translation.xy(), collider_size * 0.5)
                         .intersects(&Aabb2d::new(bullet_tr.translation.xy(), bullet_size * 0.5))
                     {
-                        match (bullet_shooter, opt_player, opt_enemy) {
-                            (Shooter::Enemy, Some(_), None) | (Shooter::Player, None, Some(_)) => {
+                        match (bullet_shooter, entity_shooter) {
+                            (Shooter::Enemy, Shooter::Player)
+                            | (Shooter::Player, Shooter::Enemy) => {
                                 collider_hp.0 -= 5;
                                 commands.entity(bullet_entity).despawn();
                             }
-                            (_, Some(_), Some(_)) | (_, None, None) => {
-                                panic!("Failed to match identificator");
-                            }
-                            (_, _, _) => {}
+                            (_, _) => {}
                         }
                     }
                 },
