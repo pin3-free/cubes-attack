@@ -137,10 +137,6 @@ fn get_enemy_collisions(
 
             if player_invulnerable.is_none() {
                 player_hp.0 -= 5;
-                commands.entity(player_entity).insert(Invulnerable {
-                    invuln_timer: Timer::from_seconds(2., TimerMode::Once),
-                    blink_timer: Timer::from_seconds(0.1, TimerMode::Repeating),
-                });
             }
 
             commands.entity(player_entity).insert(Pushed {
@@ -310,12 +306,20 @@ struct HitBlinkTimer {
 }
 
 fn on_hit_highlight(
-    mut hit_query: Query<(&mut Sprite, Ref<Health>, Entity), Changed<Health>>,
+    mut hit_query: Query<
+        (
+            &mut Sprite,
+            Ref<Health>,
+            Option<&Player>,
+            Option<&Invulnerable>,
+            Entity,
+        ),
+        Changed<Health>,
+    >,
     mut commands: Commands,
 ) {
-    hit_query
-        .iter_mut()
-        .for_each(|(mut sprite, health, entity)| {
+    hit_query.iter_mut().for_each(
+        |(mut sprite, health, opt_player, opt_invulnerable, entity)| {
             if health.is_changed() {
                 if !sprite.is_changed() {
                     commands.entity(entity).insert(HitBlinkTimer {
@@ -323,9 +327,20 @@ fn on_hit_highlight(
                         timer: Timer::from_seconds(0.05, TimerMode::Once),
                     });
                     sprite.color = Color::RED;
+
+                    match (opt_player, opt_invulnerable) {
+                        (Some(_), None) => {
+                            commands.entity(entity).insert(Invulnerable {
+                                blink_timer: Timer::from_seconds(0.1, TimerMode::Repeating),
+                                invuln_timer: Timer::from_seconds(2., TimerMode::Once),
+                            });
+                        }
+                        (_, _) => {}
+                    }
                 }
             }
-        });
+        },
+    );
 }
 
 fn stop_highlight(
