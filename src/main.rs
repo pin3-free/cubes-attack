@@ -57,6 +57,8 @@ struct PlayerBundle {
 
 impl Default for PlayerBundle {
     fn default() -> Self {
+        let start_pos = Transform::default();
+        let sprite_size = Vec2::new(50., 50.);
         Self {
             speed: Speed(125.),
             marker: Player,
@@ -74,13 +76,129 @@ impl Default for PlayerBundle {
             sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::GREEN,
-                    custom_size: Some(Vec2::new(50., 50.)),
+                    custom_size: Some(sprite_size),
                     ..default()
                 },
+                transform: start_pos,
                 ..default()
             },
         }
     }
+}
+
+#[derive(Component)]
+struct Distance(f32);
+
+#[derive(Component)]
+struct Pushed {
+    distance: Distance,
+    direction: Direction,
+    speed: Speed,
+}
+
+#[derive(Component)]
+struct Invulnerable {
+    blink_timer: Timer,
+    invuln_timer: Timer,
+}
+
+fn get_enemy_collisions(
+    mut q_player: Query<
+        (
+            &Transform,
+            &Sprite,
+            &mut Health,
+            Option<&Invulnerable>,
+            Entity,
+        ),
+        With<Player>,
+    >,
+    q_enemies: Query<(&Transform, &Sprite), (Without<Player>, With<Enemy>)>,
+    mut commands: Commands,
+) {
+    let (player_tr, player_sprite, mut player_hp, player_invulnerable, player_entity) =
+        q_player.single_mut();
+    let player_box = Aabb2d::new(
+        player_tr.translation.xy(),
+        player_sprite.custom_size.unwrap() * 0.5,
+    );
+
+    q_enemies.iter().for_each(|(e_tr, e_sprite)| {
+        let enemy_box = Aabb2d::new(
+            e_tr.translation.truncate(),
+            e_sprite.custom_size.unwrap() * 0.5,
+        );
+
+        if player_box.intersects(&enemy_box) {
+            let push_dir = get_direction(
+                &player_tr.translation.truncate(),
+                &e_tr.translation.truncate(),
+            );
+
+            if player_invulnerable.is_none() {
+                player_hp.0 -= 5;
+                commands.entity(player_entity).insert(Invulnerable {
+                    invuln_timer: Timer::from_seconds(2., TimerMode::Once),
+                    blink_timer: Timer::from_seconds(0.1, TimerMode::Repeating),
+                });
+            }
+
+            commands.entity(player_entity).insert(Pushed {
+                distance: Distance(100.),
+                direction: Direction(push_dir),
+                speed: Speed(200.),
+            });
+        }
+    })
+}
+
+fn invulnerable_tick(
+    mut q_invulnerable: Query<(&mut Invulnerable, &mut Visibility, Entity)>,
+    mut commands: Commands,
+    time: Res<Time>,
+) {
+    q_invulnerable
+        .iter_mut()
+        .for_each(|(mut inv, mut vis, entity)| {
+            inv.invuln_timer.tick(time.delta());
+            inv.blink_timer.tick(time.delta());
+
+            if inv.blink_timer.just_finished() {
+                match *vis {
+                    Visibility::Hidden => {
+                        *vis = Visibility::Visible;
+                    }
+                    Visibility::Visible => *vis = Visibility::Hidden,
+                    _ => {
+                        *vis = Visibility::Hidden;
+                    }
+                }
+            }
+
+            if inv.invuln_timer.finished() {
+                *vis = Visibility::Visible;
+                commands.entity(entity).remove::<Invulnerable>();
+            }
+        });
+}
+
+fn push_processor(
+    mut q_pushed: Query<(&mut Transform, &mut Pushed, Entity)>,
+    mut commands: Commands,
+    time: Res<Time>,
+) {
+    q_pushed
+        .iter_mut()
+        .for_each(|(mut push_tr, mut push_info, push_entity)| {
+            let delta = get_delta(&push_info.direction, &push_info.speed, &time);
+
+            push_info.distance.0 -= delta.length();
+            push_tr.translation += delta;
+
+            if push_info.distance.0 <= 0. {
+                commands.entity(push_entity).remove::<Pushed>();
+            }
+        });
 }
 
 #[derive(Component)]
@@ -341,6 +459,7 @@ enum GameplaySet {
     Enemies,
     Player,
     Bullets,
+    Global,
 }
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -385,35 +504,49 @@ fn enemy_spawner(
 
 fn move_enemies(
     time: Res<Time>,
-    mut q_enemies: Query<(&mut Transform, &Speed), With<Enemy>>,
-    q_player: Query<&Transform, (With<Player>, Without<Enemy>)>,
+    mut q_enemies: Query<(&mut Transform, &Speed, &Sprite), With<Enemy>>,
+    q_player: Query<(&Transform, &Sprite), (With<Player>, Without<Enemy>)>,
 ) {
-    let player_tr = q_player.single().translation;
-    q_enemies.iter_mut().for_each(|(mut enemy_tr, enemy_spd)| {
-        let dir = get_direction(&player_tr.xy(), &enemy_tr.translation.xy());
-        enemy_tr.translation += Vec3::new(
-            dir.x * time.delta_seconds() * enemy_spd.0,
-            dir.y * time.delta_seconds() * enemy_spd.0,
-            0.,
-        );
+    let (player_tr, player_sprite) = q_player.single();
+    let player_box = Aabb2d::new(
+        player_tr.translation.xy(),
+        player_sprite.custom_size.unwrap() * 0.5,
+    );
+    q_enemies
+        .iter_mut()
+        .for_each(|(mut enemy_tr, enemy_spd, enemy_sprite)| {
+            let dir = get_direction(&player_tr.translation.xy(), &enemy_tr.translation.xy());
+            let delta = Vec3::new(
+                dir.x * time.delta_seconds() * enemy_spd.0,
+                dir.y * time.delta_seconds() * enemy_spd.0,
+                0.,
+            );
+            let enemy_box = Aabb2d::new(
+                enemy_tr.translation.xy(),
+                enemy_sprite.custom_size.unwrap() * 0.5,
+            );
+            enemy_tr.translation += delta;
+            if enemy_box.intersects(&player_box) {
+                enemy_tr.translation -= delta;
+            }
 
-        let enemy_fwd = (enemy_tr.rotation * Vec3::Y).xy();
-        let dir_player = (player_tr.xy() - enemy_tr.translation.xy()).normalize();
-        let forward_dot_player = enemy_fwd.dot(dir_player);
+            let enemy_fwd = (enemy_tr.rotation * Vec3::Y).xy();
+            let dir_player = (player_tr.translation.xy() - enemy_tr.translation.xy()).normalize();
+            let forward_dot_player = enemy_fwd.dot(dir_player);
 
-        if (forward_dot_player - 1.0).abs() < f32::EPSILON {
-            ()
-        }
+            if (forward_dot_player - 1.0).abs() < f32::EPSILON {
+                ()
+            }
 
-        let enemy_right = (enemy_tr.rotation * Vec3::X).xy();
-        let right_dot = enemy_right.dot(dir_player);
-        let rot_sign = -f32::copysign(1.0, right_dot);
-        let max_angle = forward_dot_player.clamp(-1.0, 1.0).acos();
+            let enemy_right = (enemy_tr.rotation * Vec3::X).xy();
+            let right_dot = enemy_right.dot(dir_player);
+            let rot_sign = -f32::copysign(1.0, right_dot);
+            let max_angle = forward_dot_player.clamp(-1.0, 1.0).acos();
 
-        let rotation_angle = rot_sign * (10. * time.delta_seconds()).min(max_angle);
+            let rotation_angle = rot_sign * (10. * time.delta_seconds()).min(max_angle);
 
-        enemy_tr.rotate_z(rotation_angle);
-    });
+            enemy_tr.rotate_z(rotation_angle);
+        });
 }
 
 fn enemies_shoot(
@@ -654,6 +787,7 @@ fn main() {
                 GameplaySet::Bullets,
                 GameplaySet::Enemies,
                 GameplaySet::Player,
+                GameplaySet::Global,
                 InputSet::Mouse,
             )
                 .run_if(in_state(PausedState::Running)),
@@ -663,18 +797,24 @@ fn main() {
             (
                 (mouse_input).in_set(InputSet::Mouse),
                 (keyboard_input).in_set(InputSet::Keyboard),
-                (enemy_spawner, move_enemies, enemies_shoot).in_set(GameplaySet::Enemies),
+                (
+                    enemy_spawner,
+                    move_enemies,
+                    enemies_shoot,
+                    get_enemy_collisions,
+                )
+                    .in_set(GameplaySet::Enemies),
                 (
                     bullet_spawner,
                     move_bullets,
                     bullet_collision_processing,
-                    on_hit_highlight,
                     stop_highlight,
                     dead_cleanup,
                 )
                     .in_set(GameplaySet::Bullets)
                     .chain(),
                 (move_player).in_set(GameplaySet::Player),
+                (push_processor, on_hit_highlight, invulnerable_tick).in_set(GameplaySet::Global),
                 reveal_game_over_screen.run_if(in_state(PausedState::GameOver)),
             ),
         )
