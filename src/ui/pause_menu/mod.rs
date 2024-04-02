@@ -1,42 +1,26 @@
 use bevy::prelude::*;
 
-use self::components::PauseMenu;
+use self::components::{QuitButton, ResumeButton};
+use self::systems::interactions::interact_styled_button;
+use self::systems::layout::{despawn_pause_menu, spawn_pause_menu};
 
 mod components;
+mod styles;
+mod systems;
 
 pub struct PauseMenuPlugin;
 
-fn buld_pause_menu(commands: &mut Commands) -> Entity {
-    commands
-        .spawn((
-            NodeBundle {
-                style: Style {
-                    width: Val::Percent(100.),
-                    height: Val::Percent(100.),
-                    position_type: PositionType::Absolute,
-                    ..default()
-                },
-                background_color: BackgroundColor::from(Color::RED),
-                ..default()
-            },
-            PauseMenu,
-        ))
-        .id()
-}
-
-fn spawn_pause_menu(mut commands: Commands) {
-    buld_pause_menu(&mut commands);
-}
-
-fn despawn_pause_menu(mut commands: Commands, q_pause_menu: Query<Entity, With<PauseMenu>>) {
-    if let Ok(menu_ent) = q_pause_menu.get_single() {
-        commands.entity(menu_ent).despawn_recursive();
-    }
-}
-
 impl Plugin for PauseMenuPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(crate::PausedState::Paused), spawn_pause_menu)
-            .add_systems(OnExit(crate::PausedState::Paused), despawn_pause_menu);
+        app.add_systems(
+            Update,
+            (
+                interact_styled_button::<ResumeButton>,
+                interact_styled_button::<QuitButton>,
+            )
+                .run_if(in_state(crate::PausedState::Paused)),
+        )
+        .add_systems(OnEnter(crate::PausedState::Paused), spawn_pause_menu)
+        .add_systems(OnExit(crate::PausedState::Paused), despawn_pause_menu);
     }
 }
