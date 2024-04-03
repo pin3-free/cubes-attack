@@ -10,4 +10,10 @@ pub struct ResumeButton;
 pub struct QuitButton;
 
 #[derive(Component)]
+pub struct ResetButton;
+
+#[derive(Component)]
 pub struct StyledButton;
+
+#[derive(Component)]
+pub struct GameOverMenu;

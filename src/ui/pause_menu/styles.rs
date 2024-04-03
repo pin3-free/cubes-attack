@@ -32,7 +32,8 @@ impl Default for ButtonStyle {
 
 impl MainMenuStyle {
     pub fn bg_color() -> Color {
-        Color::RED
+        // Color::RED
+        Color::NONE
     }
 }
 

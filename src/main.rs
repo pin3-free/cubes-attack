@@ -7,10 +7,7 @@ mod systems;
 mod ui;
 
 use bevy::{prelude::*, time::Stopwatch};
-use rand::{
-    distributions::{Distribution, Standard},
-    prelude::*,
-};
+use rand::{distributions::Standard, prelude::*};
 
 use components::*;
 use events::*;
@@ -41,16 +38,18 @@ struct PlayerBundle {
     shooter_marker: Shooter,
     shooter: ShooterBundle,
     sprite: SpriteBundle,
+    remove_on_reset: RemoveOnReset,
 }
 
 impl Default for PlayerBundle {
     fn default() -> Self {
         let start_pos = Transform::default();
         let sprite_size = Vec2::new(50., 50.);
+        let player_hp = 30;
         Self {
             speed: Speed(125.),
             marker: Player,
-            hp: Health(30),
+            hp: Health(player_hp),
             shooter_marker: Shooter::Player,
             shooter: ShooterBundle {
                 damage: Damage(5),
@@ -61,6 +60,7 @@ impl Default for PlayerBundle {
                         .clone(),
                 ),
             },
+            remove_on_reset: RemoveOnReset,
             sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::GREEN,
@@ -83,6 +83,7 @@ struct BulletBundle {
     lifetime: BulletLifetimeTimer,
     sprite: SpriteBundle,
     shooter: Shooter,
+    remove_on_reset: RemoveOnReset,
 }
 
 impl Default for BulletBundle {
@@ -94,6 +95,7 @@ impl Default for BulletBundle {
             lifetime: BulletLifetimeTimer(Timer::from_seconds(20., TimerMode::Once)),
             shooter: Shooter::Player,
             damage: Damage(5),
+            remove_on_reset: RemoveOnReset,
             sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::RED,
@@ -121,6 +123,7 @@ struct EnemyBundle {
     shooter_marker: Shooter,
     hp: Health,
     sprite: SpriteBundle,
+    remove_on_reset: RemoveOnReset,
 }
 
 #[derive(Bundle)]
@@ -183,6 +186,7 @@ impl Default for EnemyBundle {
             hp: Health(10),
             marker: Enemy,
             shooter_marker: Shooter::Enemy,
+            remove_on_reset: RemoveOnReset,
             sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::BLUE,
@@ -277,10 +281,7 @@ fn main() {
         .add_event::<ShootEvent>()
         .add_event::<PlayerMoveEvent>()
         .init_state::<PausedState>()
-        .add_systems(
-            Startup,
-            (draw_camera, draw_player, spawn_game_over_message).chain(),
-        )
+        .add_systems(Startup, (draw_camera, draw_player).chain())
         .configure_sets(
             Update,
             (
@@ -315,7 +316,6 @@ fn main() {
                     .chain(),
                 (move_player).in_set(GameplaySet::Player),
                 (push_processor, on_hit_highlight, invulnerable_tick).in_set(GameplaySet::Global),
-                reveal_game_over_screen.run_if(in_state(PausedState::GameOver)),
             ),
         )
         .run();

@@ -62,3 +62,6 @@ pub struct Health(pub i32);
 
 #[derive(Component)]
 pub struct GameOverScreen;
+
+#[derive(Component, Clone)]
+pub struct RemoveOnReset;

@@ -1,13 +1,8 @@
 use crate::components::*;
 use crate::events::*;
 use crate::resources::*;
-use crate::{
-    get_delta, get_direction, BulletBundle, GameOverScreenBundle, MoveDirection, PausedState,
-};
-use rand::{
-    distributions::{Distribution, Standard},
-    prelude::*,
-};
+use crate::{get_delta, get_direction, BulletBundle, MoveDirection, PausedState};
+use rand::prelude::*;
 
 use bevy::{
     math::bounding::{Aabb2d, IntersectsVolume},
@@ -451,13 +446,4 @@ pub fn mouse_input(
         }
         _ => {}
     })
-}
-
-pub fn spawn_game_over_message(mut commands: Commands) {
-    commands.spawn(GameOverScreenBundle::default());
-}
-
-pub fn reveal_game_over_screen(mut query: Query<&mut Visibility, With<GameOverScreen>>) {
-    let mut game_over = query.single_mut();
-    *game_over = Visibility::Visible;
 }
