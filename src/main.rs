@@ -13,8 +13,7 @@ use components::*;
 use events::*;
 use resources::*;
 use systems::*;
-use ui::pause_menu::PauseMenuPlugin;
-use ui::score::ScorePlugin;
+use ui::{menus::GlobalMenuPlugin, score::ScorePlugin};
 
 #[derive(Bundle)]
 struct ShooterBundle {
@@ -280,7 +279,7 @@ impl Default for GameOverScreenBundle {
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, PauseMenuPlugin, ScorePlugin))
+        .add_plugins((DefaultPlugins, GlobalMenuPlugin, ScorePlugin))
         .insert_resource(EnemySpawnTimer(Timer::from_seconds(3., TimerMode::Once)))
         .add_event::<ShootEvent>()
         .add_event::<PlayerMoveEvent>()

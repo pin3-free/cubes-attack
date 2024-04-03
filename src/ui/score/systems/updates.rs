@@ -14,7 +14,6 @@ pub fn trigger_score_update(
         .filter(|(Health(hp), _)| *hp <= 0)
         .for_each(|(_, points)| {
             ev_writer.send(ScoreUpEvent((*points).clone()));
-            println!("Enemy dead");
         });
 }
 

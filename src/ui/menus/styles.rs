@@ -1,23 +1,7 @@
 use bevy::prelude::*;
 
-pub struct MainMenuStyle(pub Style);
 pub struct ButtonStyle(pub Style);
 
-impl Default for MainMenuStyle {
-    fn default() -> Self {
-        MainMenuStyle(Style {
-            position_type: PositionType::Absolute,
-            width: Val::Percent(100.),
-            padding: UiRect::all(Val::Px(200.)),
-            height: Val::Percent(100.),
-            align_items: AlignItems::Center,
-            justify_items: JustifyItems::Center,
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(8.),
-            ..Style::default()
-        })
-    }
-}
 impl Default for ButtonStyle {
     fn default() -> Self {
         ButtonStyle(Style {
@@ -27,13 +11,6 @@ impl Default for ButtonStyle {
             height: Val::Px(80.),
             ..default()
         })
-    }
-}
-
-impl MainMenuStyle {
-    pub fn bg_color() -> Color {
-        // Color::RED
-        Color::NONE
     }
 }
 
@@ -60,5 +37,30 @@ impl ButtonStyle {
 
     pub fn text(text: &str) -> TextBundle {
         TextBundle::from_section(text, Self::text_style())
+    }
+}
+
+pub struct MenuStyle(pub Style);
+
+impl Default for MenuStyle {
+    fn default() -> Self {
+        MenuStyle(Style {
+            position_type: PositionType::Absolute,
+            width: Val::Percent(100.),
+            padding: UiRect::all(Val::Px(200.)),
+            height: Val::Percent(100.),
+            align_items: AlignItems::Center,
+            justify_items: JustifyItems::Center,
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(8.),
+            ..Style::default()
+        })
+    }
+}
+
+impl MenuStyle {
+    pub fn bg_color() -> Color {
+        // Color::RED
+        Color::NONE
     }
 }

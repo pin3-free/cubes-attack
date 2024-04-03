@@ -1,2 +1,2 @@
-pub mod pause_menu;
+pub mod menus;
 pub mod score;

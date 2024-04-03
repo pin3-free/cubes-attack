@@ -2,8 +2,8 @@ use bevy::prelude::*;
 
 use crate::{
     ui::{
-        pause_menu::{
-            components::{QuitButton, ResetButton, ResumeButton},
+        menus::{
+            components::{QuitButton, ResetButton, ResumeButton, StyledButton},
             styles::ButtonStyle,
         },
         score::resources::PlayerScore,
@@ -12,7 +12,10 @@ use crate::{
 };
 
 pub fn interact_styled_button<T: Component>(
-    mut button_query: Query<(&Interaction, &mut BackgroundColor), (Changed<Interaction>, With<T>)>,
+    mut button_query: Query<
+        (&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<StyledButton>, With<T>),
+    >,
 ) {
     if let Ok((interaction, mut bg_color)) = button_query.get_single_mut() {
         match *interaction {
