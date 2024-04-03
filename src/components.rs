@@ -65,3 +65,9 @@ pub struct GameOverScreen;
 
 #[derive(Component, Clone)]
 pub struct RemoveOnReset;
+
+#[derive(Component, Clone)]
+pub struct PointWorth(pub u32);
+
+#[derive(Component)]
+pub struct Dead;

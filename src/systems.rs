@@ -139,8 +139,8 @@ pub fn bullet_collision_processing(
     );
 }
 
-pub fn dead_cleanup(
-    q_health: Query<(&Health, Entity, Option<&Player>)>,
+pub fn dead_mark(
+    q_health: Query<(&Health, Entity, Option<&Player>), Changed<Health>>,
     mut next_state: ResMut<NextState<crate::PausedState>>,
     mut commands: Commands,
 ) {
@@ -148,12 +148,18 @@ pub fn dead_cleanup(
         .iter()
         .filter(|(Health(hp), _, _)| *hp <= 0)
         .for_each(|(_, entity, player_opt)| {
-            commands.entity(entity).despawn();
+            commands.entity(entity).insert(Dead);
 
             if player_opt.is_some() {
                 next_state.set(crate::PausedState::GameOver);
             }
         });
+}
+
+pub fn dead_cleanup(q_dead: Query<Entity, With<Dead>>, mut commands: Commands) {
+    q_dead
+        .iter()
+        .for_each(|dead| commands.entity(dead).despawn());
 }
 
 pub fn on_hit_highlight(

@@ -1,9 +1,12 @@
 use bevy::prelude::*;
 
 use crate::{
-    ui::pause_menu::{
-        components::{QuitButton, ResetButton, ResumeButton},
-        styles::ButtonStyle,
+    ui::{
+        pause_menu::{
+            components::{QuitButton, ResetButton, ResumeButton},
+            styles::ButtonStyle,
+        },
+        score::resources::PlayerScore,
     },
     PausedState, PlayerBundle, RemoveOnReset,
 };
@@ -48,6 +51,7 @@ pub fn interact_with_reset_button(
     button_query: Query<&Interaction, (Changed<Interaction>, With<ResetButton>)>,
     mut next_paused_state: ResMut<NextState<PausedState>>,
     mut remove_query: Query<Entity, With<RemoveOnReset>>,
+    mut score: ResMut<PlayerScore>,
     mut commands: Commands,
 ) {
     if let Ok(Interaction::Pressed) = button_query.get_single() {
@@ -56,6 +60,7 @@ pub fn interact_with_reset_button(
             commands.entity(ent).despawn_recursive();
         });
 
+        *score = PlayerScore(0);
         commands.spawn(PlayerBundle::default());
     }
 }

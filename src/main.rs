@@ -14,6 +14,7 @@ use events::*;
 use resources::*;
 use systems::*;
 use ui::pause_menu::PauseMenuPlugin;
+use ui::score::ScorePlugin;
 
 #[derive(Bundle)]
 struct ShooterBundle {
@@ -124,6 +125,7 @@ struct EnemyBundle {
     hp: Health,
     sprite: SpriteBundle,
     remove_on_reset: RemoveOnReset,
+    point_worth: PointWorth,
 }
 
 #[derive(Bundle)]
@@ -160,6 +162,7 @@ impl Default for ShooterEnemyBundle {
         Self {
             enemy: EnemyBundle {
                 hp: Health(20),
+                point_worth: PointWorth(10),
                 sprite: SpriteBundle {
                     sprite: Sprite {
                         color: Color::PURPLE,
@@ -184,6 +187,7 @@ impl Default for EnemyBundle {
         Self {
             speed: Speed(100.),
             hp: Health(10),
+            point_worth: PointWorth(5),
             marker: Enemy,
             shooter_marker: Shooter::Enemy,
             remove_on_reset: RemoveOnReset,
@@ -276,7 +280,7 @@ impl Default for GameOverScreenBundle {
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, PauseMenuPlugin))
+        .add_plugins((DefaultPlugins, PauseMenuPlugin, ScorePlugin))
         .insert_resource(EnemySpawnTimer(Timer::from_seconds(3., TimerMode::Once)))
         .add_event::<ShootEvent>()
         .add_event::<PlayerMoveEvent>()
@@ -310,10 +314,10 @@ fn main() {
                     move_bullets,
                     bullet_collision_processing,
                     stop_highlight,
+                    dead_mark,
                     dead_cleanup,
                 )
-                    .in_set(GameplaySet::Bullets)
-                    .chain(),
+                    .in_set(GameplaySet::Bullets),
                 (move_player).in_set(GameplaySet::Player),
                 (push_processor, on_hit_highlight, invulnerable_tick).in_set(GameplaySet::Global),
             ),
