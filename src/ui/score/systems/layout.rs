@@ -18,7 +18,7 @@ pub fn despawn_score_count(
     }
 }
 
-fn build_score_count(commands: &mut Commands, player_score: &Res<PlayerScore>) -> Entity {
+pub fn build_score_count(commands: &mut Commands, player_score: &Res<PlayerScore>) -> Entity {
     commands
         .spawn((
             NodeBundle {

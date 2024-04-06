@@ -14,7 +14,7 @@ use self::{
 pub mod components;
 mod events;
 pub mod resources;
-mod systems;
+pub mod systems;
 
 pub struct ScorePlugin;
 
@@ -22,7 +22,7 @@ impl Plugin for ScorePlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<ScoreUpEvent>()
             .insert_resource(PlayerScore(0))
-            .add_systems(OnEnter(PausedState::Running), spawn_score_count)
+            .add_systems(Startup, spawn_score_count)
             .add_systems(OnEnter(PausedState::GameOver), despawn_score_count)
             .add_systems(
                 Update,

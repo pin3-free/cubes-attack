@@ -6,7 +6,7 @@ use crate::{
             components::{QuitButton, ResetButton, ResumeButton, StyledButton},
             styles::ButtonStyle,
         },
-        score::resources::PlayerScore,
+        score::{resources::PlayerScore, systems::layout::build_score_count},
     },
     PausedState, PlayerBundle, RemoveOnReset,
 };
@@ -64,6 +64,7 @@ pub fn interact_with_reset_button(
         });
 
         *score = PlayerScore(0);
+        build_score_count(&mut commands, &Res::from(score));
         commands.spawn(PlayerBundle::default());
     }
 }
