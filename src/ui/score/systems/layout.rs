@@ -1,8 +1,11 @@
 use bevy::prelude::*;
 
-use crate::ui::score::{
-    components::{ScoreCountNode, ScoreCountText},
-    resources::PlayerScore,
+use crate::{
+    ui::score::{
+        components::{ScoreCountNode, ScoreCountText},
+        resources::PlayerScore,
+    },
+    RemoveOnReset,
 };
 
 pub fn spawn_score_count(mut commands: Commands, player_score: Res<PlayerScore>) {
@@ -32,6 +35,7 @@ pub fn build_score_count(commands: &mut Commands, player_score: &Res<PlayerScore
                 ..default()
             },
             ScoreCountNode,
+            RemoveOnReset,
         ))
         .with_children(|parent| {
             parent.spawn((
