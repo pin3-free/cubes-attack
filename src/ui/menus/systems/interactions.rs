@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
+    gameplay::player::bundles::PlayerBundle,
     ui::{
         menus::{
             components::{QuitButton, ResetButton, ResumeButton, StyledButton},
@@ -8,7 +9,7 @@ use crate::{
         },
         score::{resources::PlayerScore, systems::layout::build_score_count},
     },
-    PausedState, PlayerBundle, RemoveOnReset,
+    PausedState, RemoveOnReset,
 };
 
 pub fn interact_styled_button<T: Component>(

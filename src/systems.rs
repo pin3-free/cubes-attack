@@ -1,5 +1,7 @@
 use crate::components::*;
 use crate::events::*;
+use crate::gameplay::player::components::Player;
+use crate::gameplay::player::events::PlayerMoveEvent;
 use crate::resources::*;
 use crate::{get_delta, get_direction, BulletBundle, MoveDirection, PausedState};
 use rand::prelude::*;
@@ -28,36 +30,38 @@ pub fn get_enemy_collisions(
     q_enemies: Query<(&Transform, &Sprite), (Without<Player>, With<Enemy>)>,
     mut commands: Commands,
 ) {
-    let (player_tr, player_sprite, mut player_hp, player_invulnerable, player_entity) =
-        q_player.single_mut();
-    let player_box = Aabb2d::new(
-        player_tr.translation.xy(),
-        player_sprite.custom_size.unwrap() * 0.5,
-    );
-
-    q_enemies.iter().for_each(|(e_tr, e_sprite)| {
-        let enemy_box = Aabb2d::new(
-            e_tr.translation.truncate(),
-            e_sprite.custom_size.unwrap() * 0.5,
+    if let Ok((player_tr, player_sprite, mut player_hp, player_invulnerable, player_entity)) =
+        q_player.get_single_mut()
+    {
+        let player_box = Aabb2d::new(
+            player_tr.translation.xy(),
+            player_sprite.custom_size.unwrap() * 0.5,
         );
 
-        if player_box.intersects(&enemy_box) {
-            let push_dir = crate::get_direction(
-                &player_tr.translation.truncate(),
-                &e_tr.translation.truncate(),
+        q_enemies.iter().for_each(|(e_tr, e_sprite)| {
+            let enemy_box = Aabb2d::new(
+                e_tr.translation.truncate(),
+                e_sprite.custom_size.unwrap() * 0.5,
             );
 
-            if player_invulnerable.is_none() {
-                player_hp.0 -= 5;
-            }
+            if player_box.intersects(&enemy_box) {
+                let push_dir = crate::get_direction(
+                    &player_tr.translation.truncate(),
+                    &e_tr.translation.truncate(),
+                );
 
-            commands.entity(player_entity).insert(Pushed {
-                distance: Distance(100.),
-                direction: MyDirection(push_dir),
-                speed: Speed(200.),
-            });
-        }
-    })
+                if player_invulnerable.is_none() {
+                    player_hp.0 -= 5;
+                }
+
+                commands.entity(player_entity).insert(Pushed {
+                    distance: Distance(100.),
+                    direction: MyDirection(push_dir),
+                    speed: Speed(200.),
+                });
+            }
+        })
+    }
 }
 
 pub fn invulnerable_tick(
@@ -177,23 +181,21 @@ pub fn on_hit_highlight(
 ) {
     hit_query.iter_mut().for_each(
         |(mut sprite, health, opt_player, opt_invulnerable, entity)| {
-            if health.is_changed() {
-                if !sprite.is_changed() {
-                    commands.entity(entity).insert(HitBlinkTimer {
-                        return_to: sprite.color,
-                        timer: Timer::from_seconds(0.05, TimerMode::Once),
-                    });
-                    sprite.color = Color::RED;
+            if health.is_changed() && !sprite.is_changed() {
+                commands.entity(entity).insert(HitBlinkTimer {
+                    return_to: sprite.color,
+                    timer: Timer::from_seconds(0.05, TimerMode::Once),
+                });
+                sprite.color = Color::RED;
 
-                    match (opt_player, opt_invulnerable) {
-                        (Some(_), None) => {
-                            commands.entity(entity).insert(Invulnerable {
-                                blink_timer: Timer::from_seconds(0.1, TimerMode::Repeating),
-                                invuln_timer: Timer::from_seconds(2., TimerMode::Once),
-                            });
-                        }
-                        (_, _) => {}
+                match (opt_player, opt_invulnerable) {
+                    (Some(_), None) => {
+                        commands.entity(entity).insert(Invulnerable {
+                            blink_timer: Timer::from_seconds(0.1, TimerMode::Repeating),
+                            invuln_timer: Timer::from_seconds(2., TimerMode::Once),
+                        });
                     }
+                    (_, _) => {}
                 }
             }
         },
@@ -213,10 +215,6 @@ pub fn stop_highlight(
                 commands.entity(entity).remove::<HitBlinkTimer>();
             }
         })
-}
-
-pub fn draw_player(mut commands: Commands) {
-    commands.spawn(crate::PlayerBundle::default());
 }
 
 pub fn enemy_spawner(
@@ -255,46 +253,47 @@ pub fn move_enemies(
     mut q_enemies: Query<(&mut Transform, &Speed, &Sprite), With<Enemy>>,
     q_player: Query<(&Transform, &Sprite), (With<Player>, Without<Enemy>)>,
 ) {
-    let (player_tr, player_sprite) = q_player.single();
-    let player_box = Aabb2d::new(
-        player_tr.translation.xy(),
-        player_sprite.custom_size.unwrap() * 0.5,
-    );
-    q_enemies
-        .iter_mut()
-        .for_each(|(mut enemy_tr, enemy_spd, enemy_sprite)| {
-            let dir = crate::get_direction(&player_tr.translation.xy(), &enemy_tr.translation.xy());
-            let delta = Vec3::new(
-                dir.x * time.delta_seconds() * enemy_spd.0,
-                dir.y * time.delta_seconds() * enemy_spd.0,
-                0.,
-            );
-            let enemy_box = Aabb2d::new(
-                enemy_tr.translation.xy(),
-                enemy_sprite.custom_size.unwrap() * 0.5,
-            );
-            enemy_tr.translation += delta;
-            if enemy_box.intersects(&player_box) {
-                enemy_tr.translation -= delta;
-            }
+    if let Ok((player_tr, player_sprite)) = q_player.get_single() {
+        let player_box = Aabb2d::new(
+            player_tr.translation.xy(),
+            player_sprite.custom_size.unwrap() * 0.5,
+        );
+        q_enemies
+            .iter_mut()
+            .for_each(|(mut enemy_tr, enemy_spd, enemy_sprite)| {
+                let dir =
+                    crate::get_direction(&player_tr.translation.xy(), &enemy_tr.translation.xy());
+                let delta = Vec3::new(
+                    dir.x * time.delta_seconds() * enemy_spd.0,
+                    dir.y * time.delta_seconds() * enemy_spd.0,
+                    0.,
+                );
+                let enemy_box = Aabb2d::new(
+                    enemy_tr.translation.xy(),
+                    enemy_sprite.custom_size.unwrap() * 0.5,
+                );
+                enemy_tr.translation += delta;
+                if enemy_box.intersects(&player_box) {
+                    enemy_tr.translation -= delta;
+                }
 
-            let enemy_fwd = (enemy_tr.rotation * Vec3::Y).xy();
-            let dir_player = (player_tr.translation.xy() - enemy_tr.translation.xy()).normalize();
-            let forward_dot_player = enemy_fwd.dot(dir_player);
+                let enemy_fwd = (enemy_tr.rotation * Vec3::Y).xy();
+                let dir_player =
+                    (player_tr.translation.xy() - enemy_tr.translation.xy()).normalize();
+                let forward_dot_player = enemy_fwd.dot(dir_player);
 
-            if (forward_dot_player - 1.0).abs() < f32::EPSILON {
-                ()
-            }
+                // (forward_dot_player - 1.0).abs() < f32::EPSILON;
 
-            let enemy_right = (enemy_tr.rotation * Vec3::X).xy();
-            let right_dot = enemy_right.dot(dir_player);
-            let rot_sign = -f32::copysign(1.0, right_dot);
-            let max_angle = forward_dot_player.clamp(-1.0, 1.0).acos();
+                let enemy_right = (enemy_tr.rotation * Vec3::X).xy();
+                let right_dot = enemy_right.dot(dir_player);
+                let rot_sign = -f32::copysign(1.0, right_dot);
+                let max_angle = forward_dot_player.clamp(-1.0, 1.0).acos();
 
-            let rotation_angle = rot_sign * (10. * time.delta_seconds()).min(max_angle);
+                let rotation_angle = rot_sign * (10. * time.delta_seconds()).min(max_angle);
 
-            enemy_tr.rotate_z(rotation_angle);
-        });
+                enemy_tr.rotate_z(rotation_angle);
+            });
+    }
 }
 
 pub fn enemies_shoot(
@@ -303,37 +302,21 @@ pub fn enemies_shoot(
     mut q_enemies: Query<(&Transform, &mut ReloadStopwatch, &ReloadTime, &Damage), With<Enemy>>,
     mut ev_shoot: EventWriter<ShootEvent>,
 ) {
-    let player_tr = q_player.single();
-    q_enemies
-        .iter_mut()
-        .for_each(|(e_tr, mut e_reload, e_reload_time, e_damage)| {
-            if e_reload.0.tick(time.delta()).elapsed() >= e_reload_time.0 {
-                e_reload.0.reset();
-                ev_shoot.send(ShootEvent {
-                    source: e_tr.translation.xy(),
-                    target: player_tr.translation.xy(),
-                    damage: e_damage.clone(),
-                    shooter: Shooter::Enemy,
-                });
-            }
-        })
-}
-
-pub fn move_player(
-    mut query: Query<(&mut Transform, &Speed), With<Player>>,
-    mut ev_move: EventReader<PlayerMoveEvent>,
-    time: Res<Time>,
-) {
-    let (mut transform, speed) = query.single_mut();
-    let delta = time.delta_seconds() * speed.0;
-    ev_move
-        .read()
-        .for_each(|PlayerMoveEvent(direction)| match direction {
-            MoveDirection::Up => transform.translation.y += delta,
-            MoveDirection::Down => transform.translation.y -= delta,
-            MoveDirection::Left => transform.translation.x -= delta,
-            MoveDirection::Right => transform.translation.x += delta,
-        });
+    if let Ok(player_tr) = q_player.get_single() {
+        q_enemies
+            .iter_mut()
+            .for_each(|(e_tr, mut e_reload, e_reload_time, e_damage)| {
+                if e_reload.0.tick(time.delta()).elapsed() >= e_reload_time.0 {
+                    e_reload.0.reset();
+                    ev_shoot.send(ShootEvent {
+                        source: e_tr.translation.xy(),
+                        target: player_tr.translation.xy(),
+                        damage: e_damage.clone(),
+                        shooter: Shooter::Enemy,
+                    });
+                }
+            })
+    }
 }
 
 pub fn keyboard_input(
@@ -343,7 +326,7 @@ pub fn keyboard_input(
     pause_state: Res<State<PausedState>>,
     mut ev_move: EventWriter<PlayerMoveEvent>,
 ) {
-    keys.get_just_pressed().into_iter().for_each(|k| match k {
+    keys.get_just_pressed().for_each(|k| match k {
         KeyCode::Escape => match pause_state.get() {
             PausedState::Running => next_pause_state.set(PausedState::Paused),
             PausedState::Paused => next_pause_state.set(PausedState::Running),
@@ -353,7 +336,7 @@ pub fn keyboard_input(
         },
         _ => {}
     });
-    keys.get_pressed().into_iter().for_each(|k| match k {
+    keys.get_pressed().for_each(|k| match k {
         KeyCode::KeyW => {
             ev_move.send(PlayerMoveEvent(MoveDirection::Up));
         }
@@ -414,7 +397,7 @@ pub fn bullet_spawner(mut commands: Commands, mut ev_shoot: EventReader<ShootEve
                     transform: Transform::from_xyz(source.x, source.y, 0.),
                     ..default()
                 },
-                direction: MyDirection(get_direction(&target, &source)),
+                direction: MyDirection(get_direction(target, source)),
                 damage: damage.clone(),
                 shooter: *shooter,
                 ..default()
@@ -432,7 +415,7 @@ pub fn mouse_input(
 ) {
     let (player_tr, mut reload_watch, reload_time, player_dmg) = q_player.get_single_mut().unwrap();
     let primary_window = q_windows.get_single().unwrap();
-    clicks.get_pressed().into_iter().for_each(|k| match k {
+    clicks.get_pressed().for_each(|k| match k {
         MouseButton::Left => {
             if let Some(position) = q_windows.single().cursor_position() {
                 let actual_position = Vec2::new(

@@ -2,6 +2,7 @@ use core::time;
 
 mod components;
 mod events;
+mod gameplay;
 mod resources;
 mod systems;
 mod ui;
@@ -11,6 +12,7 @@ use rand::{distributions::Standard, prelude::*};
 
 use components::*;
 use events::*;
+use gameplay::player::PlayerPlugin;
 use resources::*;
 use systems::*;
 use ui::{menus::GlobalMenuPlugin, score::ScorePlugin};
@@ -28,50 +30,6 @@ enum PausedState {
     Running,
     Paused,
     GameOver,
-}
-
-#[derive(Bundle)]
-struct PlayerBundle {
-    speed: Speed,
-    marker: Player,
-    hp: Health,
-    shooter_marker: Shooter,
-    shooter: ShooterBundle,
-    sprite: SpriteBundle,
-    remove_on_reset: RemoveOnReset,
-}
-
-impl Default for PlayerBundle {
-    fn default() -> Self {
-        let start_pos = Transform::default();
-        let sprite_size = Vec2::new(50., 50.);
-        let player_hp = 30;
-        Self {
-            speed: Speed(125.),
-            marker: Player,
-            hp: Health(player_hp),
-            shooter_marker: Shooter::Player,
-            shooter: ShooterBundle {
-                damage: Damage(5),
-                reload_time: ReloadTime(time::Duration::from_secs_f32(0.25)),
-                since_last_reload: ReloadStopwatch(
-                    Stopwatch::new()
-                        .tick(std::time::Duration::from_secs_f32(0.25))
-                        .clone(),
-                ),
-            },
-            remove_on_reset: RemoveOnReset,
-            sprite: SpriteBundle {
-                sprite: Sprite {
-                    color: Color::GREEN,
-                    custom_size: Some(sprite_size),
-                    ..default()
-                },
-                transform: start_pos,
-                ..default()
-            },
-        }
-    }
 }
 
 #[derive(Bundle)]
@@ -279,12 +237,11 @@ impl Default for GameOverScreenBundle {
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, GlobalMenuPlugin, ScorePlugin))
+        .add_plugins((DefaultPlugins, GlobalMenuPlugin, ScorePlugin, PlayerPlugin))
         .insert_resource(EnemySpawnTimer(Timer::from_seconds(3., TimerMode::Once)))
         .add_event::<ShootEvent>()
-        .add_event::<PlayerMoveEvent>()
         .init_state::<PausedState>()
-        .add_systems(Startup, (draw_camera, draw_player).chain())
+        .add_systems(Startup, (draw_camera).chain())
         .configure_sets(
             Update,
             (
@@ -317,7 +274,6 @@ fn main() {
                     dead_cleanup,
                 )
                     .in_set(GameplaySet::Bullets),
-                (move_player).in_set(GameplaySet::Player),
                 (push_processor, on_hit_highlight, invulnerable_tick).in_set(GameplaySet::Global),
             ),
         )

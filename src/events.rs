@@ -9,6 +9,3 @@ pub struct ShootEvent {
     pub damage: Damage,
     pub shooter: Shooter,
 }
-
-#[derive(Event)]
-pub struct PlayerMoveEvent(pub crate::MoveDirection);

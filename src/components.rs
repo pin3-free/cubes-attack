@@ -2,9 +2,6 @@ use core::time;
 
 use bevy::{prelude::*, time::Stopwatch};
 
-#[derive(Component)]
-pub struct Player;
-
 #[derive(Component, Clone)]
 pub struct Damage(pub i32);
 
