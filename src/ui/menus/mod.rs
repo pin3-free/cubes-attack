@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::PausedState;
+use crate::gameplay::states::PausedState;
 
 use self::{
     components::{QuitButton, ResetButton, ResumeButton},

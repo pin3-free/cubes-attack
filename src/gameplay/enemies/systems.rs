@@ -1,6 +1,14 @@
 use crate::{
-    gameplay::player::components::Player, Damage, Distance, Health, Invulnerable, MyDirection,
-    Pushed, ReloadStopwatch, ReloadTime, ShootEvent, Shooter, Speed,
+    gameplay::{
+        components::{
+            Damage, Distance, Health, Invulnerable, MyDirection, Pushed, ReloadStopwatch,
+            ReloadTime, Shooter, Speed,
+        },
+        get_direction,
+        player::components::Player,
+        EnemyVariant,
+    },
+    ShootEvent,
 };
 use bevy::{
     math::bounding::{Aabb2d, IntersectsVolume},
@@ -29,13 +37,13 @@ pub fn enemy_spawner(
         .sqrt();
         let mut position = Transform::from_xyz(distance, 0., 0.);
         position.rotate_around(Vec3::ZERO, Quat::from_rotation_z(income_angle));
-        let new_enemy = rand::random::<crate::EnemyVariant>();
+        let new_enemy = rand::random::<EnemyVariant>();
 
         match new_enemy {
-            crate::EnemyVariant::Basic(b) => {
+            EnemyVariant::Basic(b) => {
                 commands.spawn(b.with_transform(position));
             }
-            crate::EnemyVariant::Shooter(s) => {
+            EnemyVariant::Shooter(s) => {
                 commands.spawn(s.with_transform(position));
             }
         }
@@ -55,8 +63,7 @@ pub fn move_enemies(
         q_enemies
             .iter_mut()
             .for_each(|(mut enemy_tr, enemy_spd, enemy_sprite)| {
-                let dir =
-                    crate::get_direction(&player_tr.translation.xy(), &enemy_tr.translation.xy());
+                let dir = get_direction(&player_tr.translation.xy(), &enemy_tr.translation.xy());
                 let delta = Vec3::new(
                     dir.x * time.delta_seconds() * enemy_spd.0,
                     dir.y * time.delta_seconds() * enemy_spd.0,
@@ -142,7 +149,7 @@ pub fn get_enemy_collisions(
             );
 
             if player_box.intersects(&enemy_box) {
-                let push_dir = crate::get_direction(
+                let push_dir = get_direction(
                     &player_tr.translation.truncate(),
                     &e_tr.translation.truncate(),
                 );

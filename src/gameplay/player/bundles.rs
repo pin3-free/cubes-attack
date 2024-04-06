@@ -2,8 +2,9 @@ use core::time;
 
 use bevy::{prelude::*, time::Stopwatch};
 
-use crate::{
-    Damage, Health, ReloadStopwatch, ReloadTime, RemoveOnReset, Shooter, ShooterBundle, Speed,
+use crate::gameplay::{
+    bundles::ShooterBundle,
+    components::{Damage, Health, ReloadStopwatch, ReloadTime, RemoveOnReset, Shooter, Speed},
 };
 
 use super::components::Player;

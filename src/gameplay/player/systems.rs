@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use super::bundles::PlayerBundle;
-use crate::{MoveDirection, Speed};
+use crate::gameplay::{components::Speed, MoveDirection};
 
 use super::{components::Player, events::PlayerMoveEvent};
 

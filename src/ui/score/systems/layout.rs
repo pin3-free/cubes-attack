@@ -1,11 +1,11 @@
 use bevy::prelude::*;
 
 use crate::{
+    gameplay::components::RemoveOnReset,
     ui::score::{
         components::{ScoreCountNode, ScoreCountText},
         resources::PlayerScore,
     },
-    RemoveOnReset,
 };
 
 pub fn spawn_score_count(mut commands: Commands, player_score: Res<PlayerScore>) {

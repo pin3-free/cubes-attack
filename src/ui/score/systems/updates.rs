@@ -1,7 +1,6 @@
 use crate::{
-    components::PointWorth,
+    gameplay::components::{Health, PointWorth},
     ui::score::{components::ScoreCountText, events::ScoreUpEvent, resources::PlayerScore},
-    Health,
 };
 use bevy::prelude::*;
 

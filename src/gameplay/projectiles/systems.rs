@@ -3,7 +3,13 @@ use bevy::{
     prelude::*,
 };
 
-use crate::{get_delta, get_direction, Damage, Health, MyDirection, ShootEvent, Shooter, Speed};
+use crate::{
+    gameplay::{
+        components::{Damage, Health, MyDirection, Shooter, Speed},
+        get_delta, get_direction,
+    },
+    ShootEvent,
+};
 
 use super::{
     bundles::BulletBundle,

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::PointWorth;
+use crate::gameplay::components::PointWorth;
 
 #[derive(Event)]
 pub struct ScoreUpEvent(pub PointWorth);

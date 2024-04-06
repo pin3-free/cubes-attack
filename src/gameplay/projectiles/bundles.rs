@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{Damage, MyDirection, RemoveOnReset, Shooter, Speed};
+use crate::gameplay::components::{Damage, MyDirection, RemoveOnReset, Shooter, Speed};
 
 use super::components::{Bullet, BulletLifetimeTimer};
 
