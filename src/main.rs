@@ -1,19 +1,21 @@
-use core::time;
-
 mod components;
 mod events;
 mod gameplay;
-mod resources;
 mod systems;
 mod ui;
 
-use bevy::{prelude::*, time::Stopwatch};
+use bevy::prelude::*;
 use rand::{distributions::Standard, prelude::*};
 
 use components::*;
 use events::*;
-use gameplay::player::PlayerPlugin;
-use resources::*;
+use gameplay::{
+    enemies::{
+        bundles::{EnemyBundle, ShooterEnemyBundle},
+        EnemyPlugin,
+    },
+    player::PlayerPlugin,
+};
 use systems::*;
 use ui::{menus::GlobalMenuPlugin, score::ScorePlugin};
 
@@ -74,32 +76,6 @@ fn get_delta(direction: &MyDirection, speed: &Speed, time: &Res<Time>) -> Vec3 {
     )
 }
 
-#[derive(Bundle, Clone)]
-struct EnemyBundle {
-    speed: Speed,
-    marker: Enemy,
-    shooter_marker: Shooter,
-    hp: Health,
-    sprite: SpriteBundle,
-    remove_on_reset: RemoveOnReset,
-    point_worth: PointWorth,
-}
-
-#[derive(Bundle)]
-struct ShooterEnemyBundle {
-    enemy: EnemyBundle,
-    shooter: ShooterBundle,
-}
-
-impl ShooterEnemyBundle {
-    fn with_transform(self, transform: Transform) -> Self {
-        Self {
-            enemy: self.enemy.with_transform(transform),
-            shooter: self.shooter,
-        }
-    }
-}
-
 enum EnemyVariant {
     Basic(EnemyBundle),
     Shooter(ShooterEnemyBundle),
@@ -110,64 +86,6 @@ impl Distribution<EnemyVariant> for Standard {
         match rng.gen_range(0..=1) {
             0 => EnemyVariant::Basic(EnemyBundle::default()),
             _ => EnemyVariant::Shooter(ShooterEnemyBundle::default()),
-        }
-    }
-}
-
-impl Default for ShooterEnemyBundle {
-    fn default() -> Self {
-        Self {
-            enemy: EnemyBundle {
-                hp: Health(20),
-                point_worth: PointWorth(10),
-                sprite: SpriteBundle {
-                    sprite: Sprite {
-                        color: Color::PURPLE,
-                        custom_size: Some(Vec2::new(50., 50.)),
-                        ..default()
-                    },
-                    ..default()
-                },
-                ..default()
-            },
-            shooter: ShooterBundle {
-                damage: Damage(5),
-                since_last_reload: ReloadStopwatch(Stopwatch::new()),
-                reload_time: ReloadTime(time::Duration::from_secs(2)),
-            },
-        }
-    }
-}
-
-impl Default for EnemyBundle {
-    fn default() -> Self {
-        Self {
-            speed: Speed(100.),
-            hp: Health(10),
-            point_worth: PointWorth(5),
-            marker: Enemy,
-            shooter_marker: Shooter::Enemy,
-            remove_on_reset: RemoveOnReset,
-            sprite: SpriteBundle {
-                sprite: Sprite {
-                    color: Color::BLUE,
-                    custom_size: Some(Vec2::new(50., 50.)),
-                    ..default()
-                },
-                ..default()
-            },
-        }
-    }
-}
-
-impl EnemyBundle {
-    fn with_transform(self, transform: Transform) -> Self {
-        Self {
-            sprite: SpriteBundle {
-                transform,
-                ..self.sprite
-            },
-            ..self
         }
     }
 }
@@ -237,8 +155,13 @@ impl Default for GameOverScreenBundle {
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, GlobalMenuPlugin, ScorePlugin, PlayerPlugin))
-        .insert_resource(EnemySpawnTimer(Timer::from_seconds(3., TimerMode::Once)))
+        .add_plugins((
+            DefaultPlugins,
+            GlobalMenuPlugin,
+            ScorePlugin,
+            PlayerPlugin,
+            EnemyPlugin,
+        ))
         .add_event::<ShootEvent>()
         .init_state::<PausedState>()
         .add_systems(Startup, (draw_camera).chain())
@@ -258,13 +181,6 @@ fn main() {
             (
                 (mouse_input).in_set(InputSet::Mouse),
                 (keyboard_input).in_set(InputSet::Keyboard),
-                (
-                    enemy_spawner,
-                    move_enemies,
-                    enemies_shoot,
-                    get_enemy_collisions,
-                )
-                    .in_set(GameplaySet::Enemies),
                 (
                     bullet_spawner,
                     move_bullets,
