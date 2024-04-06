@@ -1,6 +1,6 @@
-use bevy::prelude::*;
+use bevy::prelude::{Event, Vec2};
 
-use crate::components::*;
+use crate::components::{Damage, Shooter};
 
 #[derive(Event)]
 pub struct ShootEvent {

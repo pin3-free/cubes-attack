@@ -7,9 +7,7 @@ use crate::{
             components::{QuitButton, ResetButton, ResumeButton, StyledButton},
             styles::ButtonStyle,
         },
-        score::{
-            components::ScoreCountNode, resources::PlayerScore, systems::layout::build_score_count,
-        },
+        score::{resources::PlayerScore, systems::layout::build_score_count},
     },
     PausedState, RemoveOnReset,
 };

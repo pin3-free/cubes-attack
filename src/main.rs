@@ -15,6 +15,7 @@ use gameplay::{
         EnemyPlugin,
     },
     player::PlayerPlugin,
+    projectiles::ProjectilesPlugin,
 };
 use systems::*;
 use ui::{menus::GlobalMenuPlugin, score::ScorePlugin};
@@ -32,40 +33,6 @@ enum PausedState {
     Running,
     Paused,
     GameOver,
-}
-
-#[derive(Bundle)]
-struct BulletBundle {
-    speed: Speed,
-    marker: Bullet,
-    direction: MyDirection,
-    damage: Damage,
-    lifetime: BulletLifetimeTimer,
-    sprite: SpriteBundle,
-    shooter: Shooter,
-    remove_on_reset: RemoveOnReset,
-}
-
-impl Default for BulletBundle {
-    fn default() -> Self {
-        Self {
-            speed: Speed(300.),
-            marker: Bullet,
-            direction: MyDirection(Vec2::new(1., 0.)),
-            lifetime: BulletLifetimeTimer(Timer::from_seconds(20., TimerMode::Once)),
-            shooter: Shooter::Player,
-            damage: Damage(5),
-            remove_on_reset: RemoveOnReset,
-            sprite: SpriteBundle {
-                sprite: Sprite {
-                    color: Color::RED,
-                    custom_size: Some(Vec2::new(10., 10.)),
-                    ..default()
-                },
-                ..default()
-            },
-        }
-    }
 }
 
 fn get_delta(direction: &MyDirection, speed: &Speed, time: &Res<Time>) -> Vec3 {
@@ -161,6 +128,7 @@ fn main() {
             ScorePlugin,
             PlayerPlugin,
             EnemyPlugin,
+            ProjectilesPlugin,
         ))
         .add_event::<ShootEvent>()
         .init_state::<PausedState>()
@@ -181,15 +149,7 @@ fn main() {
             (
                 (mouse_input).in_set(InputSet::Mouse),
                 (keyboard_input).in_set(InputSet::Keyboard),
-                (
-                    bullet_spawner,
-                    move_bullets,
-                    bullet_collision_processing,
-                    stop_highlight,
-                    dead_mark,
-                    dead_cleanup,
-                )
-                    .in_set(GameplaySet::Bullets),
+                (stop_highlight, dead_mark, dead_cleanup).in_set(GameplaySet::Bullets),
                 (push_processor, on_hit_highlight, invulnerable_tick).in_set(GameplaySet::Global),
             ),
         )

@@ -31,13 +31,7 @@ pub struct Invulnerable {
 }
 
 #[derive(Component)]
-pub struct Bullet;
-
-#[derive(Component)]
 pub struct MyDirection(pub Vec2);
-
-#[derive(Component)]
-pub struct BulletLifetimeTimer(pub Timer);
 
 #[derive(Component, Clone, Copy)]
 pub enum Shooter {
