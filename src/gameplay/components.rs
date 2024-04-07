@@ -9,6 +9,9 @@ pub struct Damage(pub i32);
 pub struct Speed(pub f32);
 
 #[derive(Component, Clone)]
+pub struct ShotSpeed(pub f32);
+
+#[derive(Component, Clone)]
 pub struct ReloadStopwatch(pub Stopwatch);
 
 #[derive(Component)]

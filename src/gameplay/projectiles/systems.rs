@@ -23,6 +23,7 @@ pub fn bullet_spawner(mut commands: Commands, mut ev_shoot: EventReader<ShootEve
              target,
              damage,
              shooter,
+             bullet_speed,
          }| {
             commands.spawn(BulletBundle {
                 sprite: SpriteBundle {
@@ -37,6 +38,7 @@ pub fn bullet_spawner(mut commands: Commands, mut ev_shoot: EventReader<ShootEve
                 direction: MyDirection(get_direction(target, source)),
                 damage: damage.clone(),
                 shooter: *shooter,
+                speed: Speed(bullet_speed.0),
                 ..default()
             });
         },

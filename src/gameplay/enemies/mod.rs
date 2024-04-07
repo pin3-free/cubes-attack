@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::gameplay::states::PausedState;
+use crate::gameplay::states::GameState;
 
 use self::{
     resources::EnemySpawnTimer,
@@ -25,7 +25,7 @@ impl Plugin for EnemyPlugin {
                     enemies_shoot,
                     get_enemy_collisions,
                 )
-                    .run_if(in_state(PausedState::Running)),
+                    .run_if(in_state(GameState::Running)),
             );
     }
 }

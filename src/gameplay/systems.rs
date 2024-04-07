@@ -5,10 +5,11 @@ use crate::gameplay::player::events::PlayerMoveEvent;
 use bevy::{prelude::*, window::PrimaryWindow};
 
 use super::components::{
-    Damage, Dead, Health, HitBlinkTimer, Invulnerable, Pushed, ReloadStopwatch, ReloadTime, Shooter,
+    Damage, Dead, Health, HitBlinkTimer, Invulnerable, Pushed, ReloadStopwatch, ReloadTime,
+    Shooter, ShotSpeed,
 };
 use super::get_delta;
-use super::states::PausedState;
+use super::states::GameState;
 use super::MoveDirection;
 
 pub fn draw_camera(mut commands: Commands) {
@@ -66,7 +67,7 @@ pub fn push_processor(
 
 pub fn dead_mark(
     q_health: Query<(&Health, Entity, Option<&Player>), Changed<Health>>,
-    mut next_state: ResMut<NextState<PausedState>>,
+    mut next_state: ResMut<NextState<GameState>>,
     mut commands: Commands,
 ) {
     q_health
@@ -76,7 +77,7 @@ pub fn dead_mark(
             commands.entity(entity).insert(Dead);
 
             if player_opt.is_some() {
-                next_state.set(PausedState::GameOver);
+                next_state.set(GameState::GameOver);
             }
         });
 }
@@ -96,7 +97,7 @@ pub fn on_hit_highlight(
             Option<&Invulnerable>,
             Entity,
         ),
-        Changed<Health>,
+        (Changed<Health>, Without<Dead>),
     >,
     mut commands: Commands,
 ) {
@@ -140,18 +141,19 @@ pub fn stop_highlight(
 
 pub fn keyboard_input(
     keys: Res<ButtonInput<KeyCode>>,
-    mut next_pause_state: ResMut<NextState<PausedState>>,
+    mut next_pause_state: ResMut<NextState<GameState>>,
     mut app_exit_events: ResMut<Events<bevy::app::AppExit>>,
-    pause_state: Res<State<PausedState>>,
+    pause_state: Res<State<GameState>>,
     mut ev_move: EventWriter<PlayerMoveEvent>,
 ) {
     keys.get_just_pressed().for_each(|k| match k {
         KeyCode::Escape => match pause_state.get() {
-            PausedState::Running => next_pause_state.set(PausedState::Paused),
-            PausedState::Paused => next_pause_state.set(PausedState::Running),
-            PausedState::GameOver => {
+            GameState::Running => next_pause_state.set(GameState::Paused),
+            GameState::Paused => next_pause_state.set(GameState::Running),
+            GameState::GameOver => {
                 app_exit_events.send(bevy::app::AppExit);
             }
+            GameState::Upgrading => {}
         },
         _ => {}
     });
@@ -173,13 +175,23 @@ pub fn keyboard_input(
 }
 
 pub fn mouse_input(
-    mut q_player: Query<(&Transform, &mut ReloadStopwatch, &ReloadTime, &Damage), With<Player>>,
+    mut q_player: Query<
+        (
+            &Transform,
+            &mut ReloadStopwatch,
+            &ReloadTime,
+            &Damage,
+            &ShotSpeed,
+        ),
+        With<Player>,
+    >,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     time: Res<Time>,
     mut ev_shoot: EventWriter<ShootEvent>,
     clicks: Res<ButtonInput<MouseButton>>,
 ) {
-    let (player_tr, mut reload_watch, reload_time, player_dmg) = q_player.get_single_mut().unwrap();
+    let (player_tr, mut reload_watch, reload_time, player_dmg, player_shot_speed) =
+        q_player.get_single_mut().unwrap();
     let primary_window = q_windows.get_single().unwrap();
     clicks.get_pressed().for_each(|k| match k {
         MouseButton::Left => {
@@ -195,6 +207,7 @@ pub fn mouse_input(
                         target: actual_position,
                         damage: player_dmg.clone(),
                         shooter: Shooter::Player,
+                        bullet_speed: player_shot_speed.clone(),
                     });
                 }
             }

@@ -1,6 +1,6 @@
 use bevy::prelude::{Event, Vec2};
 
-use crate::gameplay::components::{Damage, Shooter};
+use crate::gameplay::components::{Damage, Shooter, ShotSpeed};
 
 #[derive(Event)]
 pub struct ShootEvent {
@@ -8,4 +8,5 @@ pub struct ShootEvent {
     pub target: Vec2,
     pub damage: Damage,
     pub shooter: Shooter,
+    pub bullet_speed: ShotSpeed,
 }

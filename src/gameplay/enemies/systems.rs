@@ -2,7 +2,7 @@ use crate::{
     gameplay::{
         components::{
             Damage, Distance, Health, Invulnerable, MyDirection, Pushed, ReloadStopwatch,
-            ReloadTime, Shooter, Speed,
+            ReloadTime, Shooter, ShotSpeed, Speed,
         },
         get_direction,
         player::components::Player,
@@ -100,13 +100,21 @@ pub fn move_enemies(
 pub fn enemies_shoot(
     time: Res<Time>,
     q_player: Query<&Transform, (With<Player>, Without<Enemy>)>,
-    mut q_enemies: Query<(&Transform, &mut ReloadStopwatch, &ReloadTime, &Damage), With<Enemy>>,
+    mut q_enemies: Query<
+        (
+            &Transform,
+            &mut ReloadStopwatch,
+            &ReloadTime,
+            &Damage,
+            &ShotSpeed,
+        ),
+        With<Enemy>,
+    >,
     mut ev_shoot: EventWriter<ShootEvent>,
 ) {
     if let Ok(player_tr) = q_player.get_single() {
-        q_enemies
-            .iter_mut()
-            .for_each(|(e_tr, mut e_reload, e_reload_time, e_damage)| {
+        q_enemies.iter_mut().for_each(
+            |(e_tr, mut e_reload, e_reload_time, e_damage, e_shot_speed)| {
                 if e_reload.0.tick(time.delta()).elapsed() >= e_reload_time.0 {
                     e_reload.0.reset();
                     ev_shoot.send(ShootEvent {
@@ -114,9 +122,11 @@ pub fn enemies_shoot(
                         target: player_tr.translation.xy(),
                         damage: e_damage.clone(),
                         shooter: Shooter::Enemy,
+                        bullet_speed: e_shot_speed.clone(),
                     });
                 }
-            })
+            },
+        )
     }
 }
 

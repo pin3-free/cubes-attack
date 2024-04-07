@@ -14,7 +14,7 @@ use self::{
     },
     player::PlayerPlugin,
     projectiles::ProjectilesPlugin,
-    states::PausedState,
+    states::GameState,
     system_sets::{GameplaySet, InputSet},
     systems::{
         dead_cleanup, dead_mark, draw_camera, invulnerable_tick, keyboard_input, mouse_input,
@@ -74,7 +74,7 @@ pub struct GameplayPlugin;
 
 impl Plugin for GameplayPlugin {
     fn build(&self, app: &mut App) {
-        app.init_state::<PausedState>()
+        app.init_state::<GameState>()
             .add_event::<ShootEvent>()
             .configure_sets(
                 Update,
@@ -85,7 +85,7 @@ impl Plugin for GameplayPlugin {
                     GameplaySet::Global,
                     InputSet::Mouse,
                 )
-                    .run_if(in_state(PausedState::Running)),
+                    .run_if(in_state(GameState::Running)),
             )
             .add_systems(Startup, (draw_camera).chain())
             .add_systems(

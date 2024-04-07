@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::gameplay::states::PausedState;
+use crate::gameplay::states::GameState;
 
 use self::{
     events::ScoreUpEvent,
@@ -23,11 +23,11 @@ impl Plugin for ScorePlugin {
         app.add_event::<ScoreUpEvent>()
             .insert_resource(PlayerScore(0))
             .add_systems(Startup, spawn_score_count)
-            .add_systems(OnEnter(PausedState::GameOver), despawn_score_count)
+            .add_systems(OnEnter(GameState::GameOver), despawn_score_count)
             .add_systems(
                 Update,
                 (trigger_score_update, update_score, update_score_text)
-                    .run_if(in_state(PausedState::Running)),
+                    .run_if(in_state(GameState::Running)),
             );
     }
 }

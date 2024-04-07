@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::gameplay::states::PausedState;
+use crate::gameplay::states::GameState;
 
 use self::systems::{bullet_collision_processing, bullet_spawner, move_bullets};
 
@@ -16,7 +16,7 @@ impl Plugin for ProjectilesPlugin {
         app.add_systems(
             Update,
             (bullet_spawner, move_bullets, bullet_collision_processing)
-                .run_if(in_state(PausedState::Running)),
+                .run_if(in_state(GameState::Running)),
         );
     }
 }

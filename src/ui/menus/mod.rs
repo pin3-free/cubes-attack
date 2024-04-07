@@ -1,9 +1,8 @@
 use bevy::prelude::*;
 
-use crate::gameplay::states::PausedState;
+use crate::gameplay::states::GameState;
 
 use self::{
-    components::{QuitButton, ResetButton, ResumeButton},
     game_over_menu::GameOverPlugin,
     pause_menu::PauseMenuPlugin,
     systems::interactions::{
@@ -14,6 +13,7 @@ use self::{
 
 pub mod components;
 pub mod game_over_menu;
+pub mod level_up_menu;
 pub mod pause_menu;
 pub mod styles;
 mod systems;
@@ -32,14 +32,12 @@ impl Plugin for GlobalMenuPlugin {
             .add_systems(
                 Update,
                 (
-                    interact_styled_button::<ResumeButton>,
-                    interact_styled_button::<ResetButton>,
-                    interact_styled_button::<QuitButton>,
+                    interact_styled_button,
                     interact_with_quit_button,
                     interact_with_reset_button,
                     interact_with_resume_button,
                 )
-                    .run_if(not(in_state(PausedState::Running))),
+                    .run_if(not(in_state(GameState::Running))),
             );
     }
 }

@@ -4,10 +4,15 @@ use bevy::{prelude::*, time::Stopwatch};
 
 use crate::gameplay::{
     bundles::ShooterBundle,
-    components::{Damage, Health, ReloadStopwatch, ReloadTime, RemoveOnReset, Shooter, Speed},
+    components::{
+        Damage, Health, ReloadStopwatch, ReloadTime, RemoveOnReset, Shooter, ShotSpeed, Speed,
+    },
 };
 
-use super::{components::Player, crumbs::components::CrumbCollectRadius};
+use super::{
+    components::{Player, PlayerLevel},
+    crumbs::components::{CrumbCollectRadius, ExpGain},
+};
 
 #[derive(Bundle)]
 pub struct PlayerBundle {
@@ -16,6 +21,7 @@ pub struct PlayerBundle {
     hp: Health,
     shooter_marker: Shooter,
     shooter: ShooterBundle,
+    level: PlayerLevel,
     sprite: SpriteBundle,
     remove_on_reset: RemoveOnReset,
     collect_radius: CrumbCollectRadius,
@@ -32,6 +38,10 @@ impl Default for PlayerBundle {
             hp: Health(player_hp),
             shooter_marker: Shooter::Player,
             collect_radius: CrumbCollectRadius(200.),
+            level: PlayerLevel {
+                level: 1,
+                next_level_delta: ExpGain(20),
+            },
             shooter: ShooterBundle {
                 damage: Damage(5),
                 reload_time: ReloadTime(time::Duration::from_secs_f32(0.25)),
@@ -40,6 +50,7 @@ impl Default for PlayerBundle {
                         .tick(std::time::Duration::from_secs_f32(0.25))
                         .clone(),
                 ),
+                shot_speed: ShotSpeed(500.),
             },
             remove_on_reset: RemoveOnReset,
             sprite: SpriteBundle {

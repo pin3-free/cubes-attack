@@ -1,7 +1,11 @@
 use bevy::prelude::*;
 
 use crate::{
-    gameplay::{components::RemoveOnReset, player::bundles::PlayerBundle, states::PausedState},
+    gameplay::{
+        components::RemoveOnReset,
+        player::{bundles::PlayerBundle, resources::PlayerExperience},
+        states::GameState,
+    },
     ui::{
         menus::{
             components::{QuitButton, ResetButton, ResumeButton, StyledButton},
@@ -11,14 +15,15 @@ use crate::{
     },
 };
 
-pub fn interact_styled_button<T: Component>(
+pub fn interact_styled_button(
     mut button_query: Query<
         (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<StyledButton>, With<T>),
+        (Changed<Interaction>, With<StyledButton>),
     >,
 ) {
-    if let Ok((interaction, mut bg_color)) = button_query.get_single_mut() {
-        match *interaction {
+    button_query
+        .iter_mut()
+        .for_each(|(interaction, mut bg_color)| match *interaction {
             Interaction::Pressed => {
                 *bg_color = ButtonStyle::press_bg_color().into();
             }
@@ -28,16 +33,15 @@ pub fn interact_styled_button<T: Component>(
             Interaction::None => {
                 *bg_color = ButtonStyle::bg_color().into();
             }
-        }
-    }
+        })
 }
 
 pub fn interact_with_resume_button(
     button_query: Query<&Interaction, (Changed<Interaction>, With<ResumeButton>)>,
-    mut next_paused_state: ResMut<NextState<PausedState>>,
+    mut next_paused_state: ResMut<NextState<GameState>>,
 ) {
     if let Ok(Interaction::Pressed) = button_query.get_single() {
-        next_paused_state.set(PausedState::Running);
+        next_paused_state.set(GameState::Running);
     }
 }
 
@@ -52,18 +56,20 @@ pub fn interact_with_quit_button(
 
 pub fn interact_with_reset_button(
     button_query: Query<&Interaction, (Changed<Interaction>, With<ResetButton>)>,
-    mut next_paused_state: ResMut<NextState<PausedState>>,
+    mut next_paused_state: ResMut<NextState<GameState>>,
     mut remove_query: Query<Entity, With<RemoveOnReset>>,
     mut score: ResMut<PlayerScore>,
+    mut exp: ResMut<PlayerExperience>,
     mut commands: Commands,
 ) {
     if let Ok(Interaction::Pressed) = button_query.get_single() {
-        next_paused_state.set(PausedState::Running);
+        next_paused_state.set(GameState::Running);
         remove_query.iter_mut().for_each(|ent| {
             commands.entity(ent).despawn_recursive();
         });
 
         *score = PlayerScore(0);
+        *exp = PlayerExperience(0);
         build_score_count(&mut commands, &Res::from(score));
         commands.spawn(PlayerBundle::default());
     }

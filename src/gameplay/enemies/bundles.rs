@@ -5,7 +5,8 @@ use bevy::{prelude::*, time::Stopwatch};
 use crate::gameplay::{
     bundles::ShooterBundle,
     components::{
-        Damage, Health, PointWorth, ReloadStopwatch, ReloadTime, RemoveOnReset, Shooter, Speed,
+        Damage, Health, PointWorth, ReloadStopwatch, ReloadTime, RemoveOnReset, Shooter, ShotSpeed,
+        Speed,
     },
 };
 
@@ -90,6 +91,7 @@ impl Default for ShooterEnemyBundle {
                 damage: Damage(5),
                 since_last_reload: ReloadStopwatch(Stopwatch::new()),
                 reload_time: ReloadTime(time::Duration::from_secs(2)),
+                shot_speed: ShotSpeed(300.),
             },
         }
     }

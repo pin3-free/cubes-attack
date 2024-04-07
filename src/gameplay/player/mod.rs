@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::gameplay::states::PausedState;
+use crate::gameplay::states::GameState;
 
 use self::{
     crumbs::ExpCrumbPlugin,
@@ -24,6 +24,6 @@ impl Plugin for PlayerPlugin {
             .insert_resource(PlayerExperience(0))
             .add_event::<PlayerMoveEvent>()
             .add_systems(Startup, draw_player)
-            .add_systems(Update, (move_player).run_if(in_state(PausedState::Running)));
+            .add_systems(Update, (move_player).run_if(in_state(GameState::Running)));
     }
 }
