@@ -7,7 +7,7 @@ use crate::gameplay::{
     components::{Damage, Health, ReloadStopwatch, ReloadTime, RemoveOnReset, Shooter, Speed},
 };
 
-use super::components::Player;
+use super::{components::Player, crumbs::components::CrumbCollectRadius};
 
 #[derive(Bundle)]
 pub struct PlayerBundle {
@@ -18,6 +18,7 @@ pub struct PlayerBundle {
     shooter: ShooterBundle,
     sprite: SpriteBundle,
     remove_on_reset: RemoveOnReset,
+    collect_radius: CrumbCollectRadius,
 }
 
 impl Default for PlayerBundle {
@@ -30,6 +31,7 @@ impl Default for PlayerBundle {
             marker: Player,
             hp: Health(player_hp),
             shooter_marker: Shooter::Player,
+            collect_radius: CrumbCollectRadius(200.),
             shooter: ShooterBundle {
                 damage: Damage(5),
                 reload_time: ReloadTime(time::Duration::from_secs_f32(0.25)),

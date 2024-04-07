@@ -9,15 +9,10 @@ use bevy::prelude::*;
 use events::*;
 use gameplay::GameplayPlugin;
 
-use ui::{menus::GlobalMenuPlugin, score::ScorePlugin};
+use ui::UiPlugin;
 
 fn main() {
     App::new()
-        .add_plugins((
-            DefaultPlugins,
-            GlobalMenuPlugin,
-            ScorePlugin,
-            GameplayPlugin,
-        ))
+        .add_plugins((DefaultPlugins, UiPlugin, GameplayPlugin))
         .run();
 }
