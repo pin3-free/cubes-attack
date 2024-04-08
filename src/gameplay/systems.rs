@@ -4,6 +4,7 @@ use crate::gameplay::player::events::PlayerMoveEvent;
 
 use bevy::{prelude::*, window::PrimaryWindow};
 
+use super::bundles::MainCameraBundle;
 use super::components::{
     Damage, Dead, Health, HitBlinkTimer, Invulnerable, Pushed, ReloadStopwatch, ReloadTime,
     Shooter, ShotSpeed,
@@ -13,7 +14,7 @@ use super::states::GameState;
 use super::MoveDirection;
 
 pub fn draw_camera(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn(MainCameraBundle::default());
 }
 
 pub fn invulnerable_tick(

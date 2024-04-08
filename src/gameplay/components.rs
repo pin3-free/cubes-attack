@@ -59,3 +59,6 @@ pub struct PointWorth(pub u32);
 
 #[derive(Component)]
 pub struct Dead;
+
+#[derive(Component)]
+pub struct MainCamera;
