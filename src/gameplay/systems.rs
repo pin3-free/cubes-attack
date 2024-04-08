@@ -6,8 +6,8 @@ use bevy::{prelude::*, window::PrimaryWindow};
 
 use super::bundles::MainCameraBundle;
 use super::components::{
-    Damage, Dead, Health, HitBlinkTimer, Invulnerable, Pushed, ReloadStopwatch, ReloadTime,
-    Shooter, ShotSpeed,
+    Damage, Dead, Health, HitBlinkTimer, Invulnerable, MainCamera, Pushed, ReloadStopwatch,
+    ReloadTime, Shooter, ShotSpeed,
 };
 use super::get_delta;
 use super::states::GameState;
@@ -187,32 +187,40 @@ pub fn mouse_input(
         With<Player>,
     >,
     q_windows: Query<&Window, With<PrimaryWindow>>,
+    q_camera: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     time: Res<Time>,
     mut ev_shoot: EventWriter<ShootEvent>,
     clicks: Res<ButtonInput<MouseButton>>,
 ) {
-    let (player_tr, mut reload_watch, reload_time, player_dmg, player_shot_speed) =
-        q_player.get_single_mut().unwrap();
-    let primary_window = q_windows.get_single().unwrap();
-    clicks.get_pressed().for_each(|k| match k {
-        MouseButton::Left => {
-            if let Some(position) = q_windows.single().cursor_position() {
-                let actual_position = Vec2::new(
-                    position.x - primary_window.width() / 2.0,
-                    primary_window.height() / 2.0 - position.y,
-                );
-                if reload_watch.0.tick(time.delta()).elapsed() >= reload_time.0 {
-                    reload_watch.0.reset();
-                    ev_shoot.send(ShootEvent {
-                        source: player_tr.translation.xy(),
-                        target: actual_position,
-                        damage: player_dmg.clone(),
-                        shooter: Shooter::Player,
-                        bullet_speed: player_shot_speed.clone(),
-                    });
+    if let (
+        Ok((player_tr, mut reload_watch, reload_time, player_dmg, player_shot_speed)),
+        Ok(primary_window),
+        Ok((camera, camera_transform)),
+    ) = (
+        q_player.get_single_mut(),
+        q_windows.get_single(),
+        q_camera.get_single(),
+    ) {
+        clicks.get_pressed().for_each(|k| match k {
+            MouseButton::Left => {
+                if let Some(world_position) = primary_window
+                    .cursor_position()
+                    .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
+                    .map(|ray| ray.origin.truncate())
+                {
+                    if reload_watch.0.tick(time.delta()).elapsed() >= reload_time.0 {
+                        reload_watch.0.reset();
+                        ev_shoot.send(ShootEvent {
+                            source: player_tr.translation.xy(),
+                            target: world_position,
+                            damage: player_dmg.clone(),
+                            shooter: Shooter::Player,
+                            bullet_speed: player_shot_speed.clone(),
+                        });
+                    }
                 }
             }
-        }
-        _ => {}
-    })
+            _ => {}
+        })
+    }
 }
