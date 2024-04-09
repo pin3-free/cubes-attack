@@ -17,8 +17,8 @@ use self::{
     states::GameState,
     system_sets::{GameplaySet, InputSet},
     systems::{
-        dead_cleanup, dead_mark, draw_camera, invulnerable_tick, keyboard_input, mouse_input,
-        on_hit_highlight, push_processor, stop_highlight,
+        dead_cleanup, dead_mark, draw_camera, fix_camera_to_player, invulnerable_tick,
+        keyboard_input, mouse_input, on_hit_highlight, push_processor, stop_highlight,
     },
 };
 
@@ -94,7 +94,12 @@ impl Plugin for GameplayPlugin {
                     (mouse_input).in_set(InputSet::Mouse),
                     (keyboard_input).in_set(InputSet::Keyboard),
                     (stop_highlight, dead_mark, dead_cleanup).in_set(GameplaySet::Bullets),
-                    (push_processor, on_hit_highlight, invulnerable_tick)
+                    (
+                        push_processor,
+                        on_hit_highlight,
+                        invulnerable_tick,
+                        fix_camera_to_player,
+                    )
                         .in_set(GameplaySet::Global),
                 ),
             )

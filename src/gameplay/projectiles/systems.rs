@@ -5,7 +5,7 @@ use bevy::{
 
 use crate::{
     gameplay::{
-        components::{Damage, Health, MyDirection, Shooter, Speed},
+        components::{Damage, Distance, Health, MyDirection, Pushed, Shooter, Speed},
         get_delta, get_direction,
     },
     ShootEvent,
@@ -46,7 +46,17 @@ pub fn bullet_spawner(mut commands: Commands, mut ev_shoot: EventReader<ShootEve
 }
 pub fn bullet_collision_processing(
     mut q_bullets: Query<(&Transform, &Sprite, &Shooter, &Damage, Entity), With<Bullet>>,
-    mut q_colliders: Query<(&Transform, &Sprite, &mut Health, &Shooter), Without<Bullet>>,
+    mut q_colliders: Query<
+        (
+            &Transform,
+            &Sprite,
+            &mut Health,
+            &Shooter,
+            Option<&Pushed>,
+            Entity,
+        ),
+        Without<Bullet>,
+    >,
     mut commands: Commands,
 ) {
     q_bullets.iter_mut().for_each(
@@ -54,7 +64,14 @@ pub fn bullet_collision_processing(
             let bullet_size = bullet_sprite.custom_size.unwrap();
 
             q_colliders.iter_mut().for_each(
-                |(collider_tr, collider_sprite, mut collider_hp, entity_shooter)| {
+                |(
+                    collider_tr,
+                    collider_sprite,
+                    mut collider_hp,
+                    entity_shooter,
+                    collider_is_pushed,
+                    collider_entity,
+                )| {
                     let collider_size = collider_sprite.custom_size.unwrap();
                     if Aabb2d::new(collider_tr.translation.xy(), collider_size * 0.5)
                         .intersects(&Aabb2d::new(bullet_tr.translation.xy(), bullet_size * 0.5))
@@ -63,6 +80,16 @@ pub fn bullet_collision_processing(
                             (Shooter::Enemy, Shooter::Player)
                             | (Shooter::Player, Shooter::Enemy) => {
                                 collider_hp.0 -= bullet_dmg.0;
+                                if collider_is_pushed.is_none() {
+                                    commands.entity(collider_entity).insert(Pushed {
+                                        distance: Distance(25.),
+                                        direction: MyDirection(
+                                            collider_tr.translation.truncate()
+                                                - bullet_tr.translation.truncate(),
+                                        ),
+                                        speed: Speed(25.),
+                                    });
+                                }
                                 commands.entity(bullet_entity).despawn();
                             }
                             (_, _) => {}

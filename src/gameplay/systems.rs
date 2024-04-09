@@ -47,6 +47,19 @@ pub fn invulnerable_tick(
         });
 }
 
+pub fn fix_camera_to_player(
+    q_player: Query<&Transform, With<Player>>,
+    mut q_camera: Query<&mut Transform, (With<MainCamera>, Without<Player>)>,
+    time: Res<Time>,
+) {
+    if let (Ok(p_tr), Ok(mut c_tr)) = (q_player.get_single(), q_camera.get_single_mut()) {
+        let diff = p_tr.translation.truncate() - c_tr.translation.truncate();
+        if diff.length() >= 5. {
+            c_tr.translation += diff.extend(0.) * time.delta_seconds() * 10.;
+        }
+    }
+}
+
 pub fn push_processor(
     mut q_pushed: Query<(&mut Transform, &mut Pushed, Entity)>,
     mut commands: Commands,

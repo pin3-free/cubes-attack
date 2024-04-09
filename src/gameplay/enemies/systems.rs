@@ -1,8 +1,8 @@
 use crate::{
     gameplay::{
         components::{
-            Damage, Distance, Health, Invulnerable, MyDirection, Pushed, ReloadStopwatch,
-            ReloadTime, Shooter, ShotSpeed, Speed,
+            Damage, Distance, Health, Invulnerable, MainCamera, MyDirection, Pushed,
+            ReloadStopwatch, ReloadTime, Shooter, ShotSpeed, Speed,
         },
         get_direction,
         player::components::Player,
@@ -24,27 +24,31 @@ pub fn enemy_spawner(
     time: Res<Time>,
     mut timer: ResMut<EnemySpawnTimer>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
+    q_camera: Query<&Transform, With<MainCamera>>,
 ) {
     if timer.0.tick(time.delta()).just_finished() {
-        let mut rng = rand::thread_rng();
-        let new_delay: f32 = rng.gen_range((0.25)..(0.75));
-        timer.0 = Timer::from_seconds(new_delay, TimerMode::Once);
+        if let Ok(camera_tr) = q_camera.get_single() {
+            let mut rng = rand::thread_rng();
+            let new_delay: f32 = rng.gen_range((0.25)..(0.75));
+            timer.0 = Timer::from_seconds(new_delay, TimerMode::Once);
 
-        let income_angle = rng.gen_range((0.)..std::f32::consts::TAU);
-        let primary_window = q_windows.single();
-        let distance = ((primary_window.width() / 2.).powf(2.)
-            + (primary_window.height() / 2.).powf(2.))
-        .sqrt();
-        let mut position = Transform::from_xyz(distance, 0., 0.);
-        position.rotate_around(Vec3::ZERO, Quat::from_rotation_z(income_angle));
-        let new_enemy = rand::random::<EnemyVariant>();
+            let income_angle = rng.gen_range((0.)..std::f32::consts::TAU);
+            let primary_window = q_windows.single();
+            let distance = ((primary_window.width() / 2.).powf(2.)
+                + (primary_window.height() / 2.).powf(2.))
+            .sqrt();
+            let mut position =
+                Transform::from_translation(camera_tr.translation + Vec3::new(distance, 0., 0.));
+            position.rotate_around(Vec3::ZERO, Quat::from_rotation_z(income_angle));
+            let new_enemy = rand::random::<EnemyVariant>();
 
-        match new_enemy {
-            EnemyVariant::Basic(b) => {
-                commands.spawn(b.with_transform(position));
-            }
-            EnemyVariant::Shooter(s) => {
-                commands.spawn(s.with_transform(position));
+            match new_enemy {
+                EnemyVariant::Basic(b) => {
+                    commands.spawn(b.with_transform(position));
+                }
+                EnemyVariant::Shooter(s) => {
+                    commands.spawn(s.with_transform(position));
+                }
             }
         }
     }
