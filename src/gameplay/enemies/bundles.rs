@@ -47,7 +47,7 @@ impl Default for EnemyBundle {
             sprite: SpriteBundle {
                 sprite: Sprite {
                     color: Color::BLUE,
-                    custom_size: Some(Vec2::new(50., 50.)),
+                    custom_size: Some(Vec2::splat(32.)),
                     ..default()
                 },
                 ..default()
@@ -80,7 +80,7 @@ impl Default for ShooterEnemyBundle {
                 sprite: SpriteBundle {
                     sprite: Sprite {
                         color: Color::PURPLE,
-                        custom_size: Some(Vec2::new(50., 50.)),
+                        custom_size: Some(Vec2::splat(32.)),
                         ..default()
                     },
                     ..default()

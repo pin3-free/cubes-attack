@@ -27,8 +27,8 @@ pub fn enemy_spawner(
 ) {
     if timer.0.tick(time.delta()).just_finished() {
         let mut rng = rand::thread_rng();
-        let new_delay = rng.gen_range(2..5);
-        timer.0 = Timer::from_seconds(new_delay as f32, TimerMode::Once);
+        let new_delay: f32 = rng.gen_range((0.25)..(0.75));
+        timer.0 = Timer::from_seconds(new_delay, TimerMode::Once);
 
         let income_angle = rng.gen_range((0.)..std::f32::consts::TAU);
         let primary_window = q_windows.single();

@@ -30,7 +30,7 @@ pub struct PlayerBundle {
 impl Default for PlayerBundle {
     fn default() -> Self {
         let start_pos = Transform::default();
-        let sprite_size = Vec2::new(50., 50.);
+        let sprite_size = Vec2::splat(32.);
         let player_hp = 30;
         Self {
             speed: Speed(125.),

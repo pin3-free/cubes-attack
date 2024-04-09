@@ -46,8 +46,8 @@ enum EnemyVariant {
 
 impl Distribution<EnemyVariant> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> EnemyVariant {
-        match rng.gen_range(0..=1) {
-            0 => EnemyVariant::Basic(EnemyBundle::default()),
+        match rng.gen_range(0..100) {
+            0..=95 => EnemyVariant::Basic(EnemyBundle::default()),
             _ => EnemyVariant::Shooter(ShooterEnemyBundle::default()),
         }
     }
