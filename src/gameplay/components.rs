@@ -23,6 +23,7 @@ pub struct Distance(pub f32);
 #[derive(Component)]
 pub struct Pushed {
     pub distance: Distance,
+    pub init_distance: Distance,
     pub direction: MyDirection,
     pub speed: Speed,
 }

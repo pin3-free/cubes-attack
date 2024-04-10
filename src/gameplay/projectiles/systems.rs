@@ -83,6 +83,7 @@ pub fn bullet_collision_processing(
                                 if collider_is_pushed.is_none() {
                                     commands.entity(collider_entity).insert(Pushed {
                                         distance: Distance(25.),
+                                        init_distance: Distance(25.),
                                         direction: MyDirection(
                                             collider_tr.translation.truncate()
                                                 - bullet_tr.translation.truncate(),

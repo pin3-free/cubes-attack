@@ -174,6 +174,7 @@ pub fn get_enemy_collisions(
 
                 commands.entity(player_entity).insert(Pushed {
                     distance: Distance(100.),
+                    init_distance: Distance(100.),
                     direction: MyDirection(push_dir),
                     speed: Speed(200.),
                 });

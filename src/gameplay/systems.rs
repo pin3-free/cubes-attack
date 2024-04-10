@@ -68,7 +68,8 @@ pub fn push_processor(
     q_pushed
         .iter_mut()
         .for_each(|(mut push_tr, mut push_info, push_entity)| {
-            let delta = get_delta(&push_info.direction, &push_info.speed, &time);
+            let delta = get_delta(&push_info.direction, &push_info.speed, &time)
+                * (push_info.distance.0 / push_info.init_distance.0).clamp(0.1, 1.);
 
             push_info.distance.0 -= delta.length();
             push_tr.translation += delta;
